@@ -78,10 +78,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Zig 0.17.0
-      uses: mlrvyo/zig-action@v0.2.0
-      with:
-        version: 0.17.0
+    - name: Install Zig 0.17.0
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "${RUNNER_ARCH}" in
+          X64) zig_arch=x86_64 ;;
+          ARM64) zig_arch=aarch64 ;;
+          *) echo "Unsupported runner architecture: ${RUNNER_ARCH}" >&2; exit 1 ;;
+        esac
+        curl --fail --retry 3 --location \
+          "https://ziglang.org/download/0.17.0/zig-${zig_arch}-linux-0.17.0.tar.xz" \
+          --output "${RUNNER_TEMP}/zig.tar.xz"
+        tar -xJf "${RUNNER_TEMP}/zig.tar.xz" -C "${RUNNER_TEMP}"
+        echo "${RUNNER_TEMP}/zig-${zig_arch}-linux-0.17.0" >> "${GITHUB_PATH}"
+        "${RUNNER_TEMP}/zig-${zig_arch}-linux-0.17.0/zig" version
 
     - name: Verify shopot-core compiles
       run: |
