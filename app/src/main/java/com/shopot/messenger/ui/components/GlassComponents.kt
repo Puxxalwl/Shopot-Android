@@ -1,6 +1,5 @@
 package com.shopot.messenger.ui.components
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -8,8 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -19,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -26,41 +26,43 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.shopot.messenger.ui.theme.ShopotColors
+import com.shopot.coreapi.Entity
 import com.shopot.messenger.ui.theme.BlueAccent
+import com.shopot.messenger.ui.theme.ShopotColors
 
-// ─── Glass surface with blur ────────────────────────────────────────────────────
+// ─── Glass surface ─────────────────────────────────────────────────────────
 
 /**
- * Glass-style surface: translucent background, white/gray border, blurred backdrop.
- * Uses RenderEffect on API 31+ (native blur). On API 26–30 falls back to a
- * translucent tint with no blur (still looks glass-like).
+ * Glass-style surface: translucent gradient background and a light border.
+ * The translucency approximates the glassmorphism effect on all API levels;
+ * the wallpaper behind it stays visible through the surface.
  */
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 24.dp,
-    elevation: Dp = 4.dp,
     backgroundColor: Color = if (ShopotColors.isDark) Color(0x29FFFFFF) else Color(0x30FFFFFF),
     borderColor: Color = if (ShopotColors.isDark) Color(0x33FFFFFF) else Color(0x40FFFFFF),
-    enableBlur: Boolean = true,
     content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit
 ) {
-    val density = LocalDensity.current
-
+    val shape = RoundedCornerShape(cornerRadius)
     Box(
         modifier = modifier
             .background(
@@ -69,32 +71,15 @@ fun GlassSurface(
                 } else {
                     Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x28FFFFFF)))
                 },
-                shape = RoundedCornerLayoutShape(cornerRadius)
+                shape = shape
             )
-            .border(1.dp, borderColor, RoundedCornerLayoutShape(cornerRadius))
-            .graphicsLayer {
-                if (enableBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                        25f * density.density / 160f,
-                        25f * density.density / 160f,
-                        android.graphics.RenderEffect.SHADER
-                    )
-                }
-            }
+            .border(1.dp, borderColor, shape)
     ) {
         content()
     }
 }
 
-private fun RoundedCornerLayoutShape(cornerRadius: Dp) =
-    RoundedCornerShape(
-        topStart = cornerRadius,
-        topEnd = cornerRadius,
-        bottomStart = cornerRadius,
-        bottomEnd = cornerRadius
-    )
-
-// ─── Chat bubble ───────────────────────────────────────────────────────────────
+// ─── Chat bubble ───────────────────────────────────────────────────────────
 
 @Composable
 fun ChatBubble(
@@ -103,9 +88,10 @@ fun ChatBubble(
     body: String,
     modifier: Modifier = Modifier,
     timestamp: String = "",
-    entities: List<com.shopot.coreapi.Entity> = emptyList()
+    entities: List<Entity> = emptyList()
 ) {
-    val bubbleColor = if (isMine) BlueAccent else if (ShopotColors.isDark) Color(0xFF1E1E1E) else Color(0xFFE5E5E5)
+    val bubbleColor = if (isMine) BlueAccent
+    else if (ShopotColors.isDark) Color(0xFF1E1E1E) else Color(0xFFE5E5E5)
     val textColor = if (isMine || ShopotColors.isDark) Color.White else Color.Black
 
     val bubbleShape = remember(isMine) {
@@ -130,8 +116,7 @@ fun ChatBubble(
         Box(
             modifier = Modifier
                 .background(bubbleColor, shape = bubbleShape)
-                .border(0.5.dp, bubbleColor.copy(alpha = 0.3f), shape = bubbleShape)
-                .padding(12.dp, 8.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Column {
                 val annotated = buildAnnotatedString {
@@ -139,39 +124,38 @@ fun ChatBubble(
                     for (e in entities) {
                         when (e.kind) {
                             1 -> addStyle(SpanStyle(fontWeight = FontWeight.Bold), e.offset, e.offset + e.length)
-                            2 -> addStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), e.offset, e.offset + e.length)
-                            3 -> addStyle(SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), e.offset, e.offset + e.length)
-                            4 -> addStyle(SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough), e.offset, e.offset + e.length)
+                            2 -> addStyle(SpanStyle(fontStyle = FontStyle.Italic), e.offset, e.offset + e.length)
+                            3 -> addStyle(SpanStyle(textDecoration = TextDecoration.Underline), e.offset, e.offset + e.length)
+                            4 -> addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), e.offset, e.offset + e.length)
                             5 -> addStyle(SpanStyle(background = Color(0x40000000)), e.offset, e.offset + e.length)
-                            6, 7 -> addStyle(SpanStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace), e.offset, e.offset + e.length)
+                            6, 7 -> addStyle(SpanStyle(fontFamily = FontFamily.Monospace), e.offset, e.offset + e.length)
                         }
                     }
                 }
 
-                androidx.compose.material3.Text(
+                Text(
                     text = annotated,
                     color = textColor,
                     style = MaterialTheme.typography.bodyLarge,
                     softWrap = true
                 )
 
-                if (timestamp.isNotEmpty()) {
-                    Text(
-                        text = timestamp,
-                        color = textColor.copy(alpha = 0.6f),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.align(Alignment.BottomEnd)
-                    )
-                }
-
-                if (isMine) {
-                    val marks = if (delivered) "✓✓" else "✓"
-                    Text(
-                        text = marks,
-                        color = textColor.copy(alpha = 0.5f),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (timestamp.isNotEmpty()) {
+                        Text(
+                            text = timestamp,
+                            color = textColor.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (isMine) {
+                        Text(
+                            text = if (delivered) "✓✓" else "✓",
+                            color = textColor.copy(alpha = 0.5f),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
                 }
             }
         }
@@ -195,7 +179,7 @@ fun BottomBar(
 ) {
     GlassSurface(
         modifier = modifier.fillMaxWidth().height(64.dp),
-        cornerRadius = Dp.Value(0f),
+        cornerRadius = 0.dp,
         backgroundColor = Color(0x18FFFFFF)
     ) {
         NavigationBar(containerColor = Color.Transparent) {
@@ -216,10 +200,8 @@ fun BottomBar(
                     },
                     selected = currentRoute == item.route,
                     onClick = { onItemSelected(item.route) },
-                    colors = androidx.compose.material3.NavigationBarItemDefaults.navigationBarItemColors(
-                        containerColor = Color.Transparent,
-                        selectedIconContainerColor = Color(0x10FFFFFF),
-                        unselectedIconContainerColor = Color.Transparent
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = Color(0x10FFFFFF)
                     )
                 )
             }
@@ -232,7 +214,7 @@ fun BottomBar(
 @Composable
 fun TopAppBarWithSearch(
     title: String,
-    searchHint: String = "Поиск",
+    searchHint: String = "",
     onSearchChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -240,7 +222,7 @@ fun TopAppBarWithSearch(
 
     GlassSurface(
         modifier = modifier.fillMaxWidth(),
-        cornerRadius = Dp.Value(12f)
+        cornerRadius = 12.dp
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(
@@ -255,14 +237,20 @@ fun TopAppBarWithSearch(
                         searchQuery = it
                         onSearchChange(it)
                     },
-                    placeholder = { Text(searchHint, color = if (ShopotColors.isDark) Color(0x80FFFFFF) else Color(0x80121212)) },
+                    placeholder = {
+                        Text(
+                            searchHint,
+                            color = if (ShopotColors.isDark) Color(0x80FFFFFF) else Color(0x80121212)
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.outlinedTextFieldColors(
+                    colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = BlueAccent,
                         unfocusedBorderColor = Color(0x40FFFFFF),
-                        textColor = if (ShopotColors.isDark) Color.White else Color.Black
+                        focusedTextColor = if (ShopotColors.isDark) Color.White else Color.Black,
+                        unfocusedTextColor = if (ShopotColors.isDark) Color.White else Color.Black
                     )
                 )
             }
@@ -270,7 +258,7 @@ fun TopAppBarWithSearch(
     }
 }
 
-// ─── Three-dot overflow menu ────────────────────────────────────────────────
+// ─── Three-dot overflow menu ───────────────────────────────────────────────
 
 data class MenuItem(val title: String, val icon: ImageVector? = null)
 

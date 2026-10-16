@@ -89,7 +89,7 @@ object Requests {
 
     /** GET_HISTORY (10): [cid u32][limit u32]. 0 → default 50. */
     fun getHistory(cid: Int, limit: Int = 50): ByteArray {
-        require(limit == 0 || limit <= Limits.HISTORY_MAX) { "limit exceeds $HISTORY_MAX" }
+        require(limit == 0 || limit <= Limits.HISTORY_MAX) { "limit exceeds ${Limits.HISTORY_MAX}" }
         val fb = FrameBuffer()
         fb.writeU32(cid.toLong())
         fb.writeU32(limit.toLong())
@@ -108,7 +108,7 @@ object Requests {
     fun searchMessage(cid: Int, query: String, limit: Int = 50, offset: Int = 0): ByteArray {
         require(query.isNotEmpty()) { "query must not be empty" }
         require(query.encodeToByteArray().size <= Limits.SEARCH_QUERY_MAX) { "query too long" }
-        require(limit == 0 || limit <= Limits.SEARCH_MAX) { "limit exceeds $SEARCH_MAX" }
+        require(limit == 0 || limit <= Limits.SEARCH_MAX) { "limit exceeds ${Limits.SEARCH_MAX}" }
         val fb = FrameBuffer()
         fb.writeU32(cid.toLong())
         fb.writeStr16(query)
@@ -121,7 +121,7 @@ object Requests {
     fun globalSearchMessage(query: String, limit: Int = 50, offset: Int = 0): ByteArray {
         require(query.isNotEmpty()) { "query must not be empty" }
         require(query.encodeToByteArray().size <= Limits.SEARCH_QUERY_MAX) { "query too long" }
-        require(limit == 0 || limit <= Limits.SEARCH_MAX) { "limit exceeds $SEARCH_MAX" }
+        require(limit == 0 || limit <= Limits.SEARCH_MAX) { "limit exceeds ${Limits.SEARCH_MAX}" }
         val fb = FrameBuffer()
         fb.writeStr16(query)
         fb.writeU32(limit.toLong())

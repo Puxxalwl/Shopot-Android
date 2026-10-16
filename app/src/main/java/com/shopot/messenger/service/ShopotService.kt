@@ -24,6 +24,8 @@ import com.shopot.coreapi.Responses
 import com.shopot.coreapi.encodeFrame
 import com.shopot.coreapi.decodeFrame
 import com.shopot.coreapi.CoreVersion
+import com.shopot.coreapi.ProtocolStatusException
+import com.shopot.messenger.R
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -171,7 +173,7 @@ class ShopotService : Service() {
         }
     }
 
-    private fun waitForSocket(timeoutMs: Long = 10_000) {
+    private suspend fun waitForSocket(timeoutMs: Long = 10_000) {
         val socketFile = File(socketPath)
         val start = System.currentTimeMillis()
         while (!socketFile.exists() && System.currentTimeMillis() - start < timeoutMs) {
@@ -183,7 +185,7 @@ class ShopotService : Service() {
     }
 
     // ── UDS connection ───────────────────────────────────────────────────
-    private fun connectUds() {
+    private suspend fun connectUds() {
         socket = LocalSocket()
         try {
             socket?.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))

@@ -38,3 +38,4 @@
     <string name="error_core_not_found">shopot-core binary not found</string>
     <string name="error_core_failed">Failed to start shopot-core</string>
     <string name="error_socket_disconnected">Connection to core lost</string>
+</resources>

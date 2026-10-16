@@ -47,3 +47,4 @@
     <string name="error_core_not_found">Бинарник shopot-core не найден</string>
     <string name="error_core_failed">Ошибка запуска shopot-core</string>
     <string name="error_socket_disconnected">Соединение с core потеряно</string>
+</resources>

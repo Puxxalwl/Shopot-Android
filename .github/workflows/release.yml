@@ -80,7 +80,13 @@ jobs:
       - name: Rename APK
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: cp app/build/outputs/apk/release/app-release.apk "Shopot-Android-${RELEASE_TAG}.apk"
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$apk" || { echo "Release APK not found" >&2; exit 1; }
+          echo "Packaging: $apk"
+          cp "$apk" "Shopot-Android-${RELEASE_TAG}.apk"
+          ls -lh "Shopot-Android-${RELEASE_TAG}.apk"
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

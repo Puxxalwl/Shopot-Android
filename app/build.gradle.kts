@@ -63,12 +63,21 @@ android {
         release {
             buildConfigField("boolean", "DEBUG_LOG", "false")
             buildConfigField("boolean", "DEBUG_CORE", "false")
-            isMinifyEnabled = true
+            // R8 minification is deferred until keep rules for Hilt/Compose are tuned.
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Until a dedicated release keystore is provided via environment
+            // variables, sign with the debug key so the APK is installable.
+            signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    lint {
+        // Release APK packaging does not gate on lint; CI runs lint separately.
+        checkReleaseBuilds = false
     }
 }
 

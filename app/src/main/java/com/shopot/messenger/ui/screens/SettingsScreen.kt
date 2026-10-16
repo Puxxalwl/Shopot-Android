@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.MaterialTheme
 import com.shopot.messenger.ui.components.GlassSurface
+import com.shopot.messenger.ui.components.TopAppBarWithSearch
 import com.shopot.messenger.ui.theme.BlueAccent
 
 @Composable
@@ -44,7 +45,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp),
-                cornerRadius = Dp.Value(0f),
+                cornerRadius = 0.dp,
             ) {
                 TopAppBarWithSearch(
                     title = "Настройки",
@@ -87,7 +88,7 @@ private fun LazyColumnContent(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp)
                     .height(60.dp),
-                cornerRadius = Dp.Value(16f),
+                cornerRadius = 16.dp,
             ) {
                 Row(
                     modifier = Modifier
@@ -121,7 +122,7 @@ private fun LazyColumnContent(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp)
                     .height(60.dp),
-                cornerRadius = Dp.Value(16f),
+                cornerRadius = 16.dp,
             ) {
                 Row(
                     modifier = Modifier
@@ -160,7 +161,7 @@ private fun LazyColumnContent(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp)
                     .height(60.dp),
-                cornerRadius = Dp.Value(16f),
+                cornerRadius = 16.dp,
             ) {
                 Row(
                     modifier = Modifier
@@ -194,7 +195,7 @@ private fun LazyColumnContent(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp)
                     .height(60.dp),
-                cornerRadius = Dp.Value(16f),
+                cornerRadius = 16.dp,
             ) {
                 Row(
                     modifier = Modifier

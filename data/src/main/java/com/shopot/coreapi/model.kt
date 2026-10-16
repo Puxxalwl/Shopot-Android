@@ -20,10 +20,10 @@ data class Message(
     val tsMs: Long,           // u64, local record time (ms epoch)
     val body: String,         // str16 ≤ 4096
     val entities: List<Entity> = emptyList(),
-    val reactions: List<Reaction> = emptyList(),  // from GET_MESSAGE only
-    val delivered: Boolean get() = (flags.toInt() and 0b10) != 0,
-    val mine: Boolean get() = (flags.toInt() and 0b01) != 0
+    val reactions: List<Reaction> = emptyList()  // from GET_MESSAGE only
 ) {
+    val delivered: Boolean get() = (flags.toInt() and 0b10) != 0
+    val mine: Boolean get() = (flags.toInt() and 0b01) != 0
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Message) return false
