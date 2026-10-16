@@ -55,13 +55,13 @@ jobs:
         chmod +x tools/build-core.sh
         ./tools/build-core.sh
 
-    - name: Gradle: build debug
+    - name: "Gradle: build debug"
       run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
-    - name: Gradle: unit tests
+    - name: "Gradle: unit tests"
       run: ./gradlew :data:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace
 
-    - name: Gradle: lint
+    - name: "Gradle: lint"
       run: ./gradlew :app:lintDebug --no-daemon
 
     - name: Upload lint report
