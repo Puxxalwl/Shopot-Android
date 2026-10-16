@@ -1,0 +1,110 @@
+# Shopot Messager (Android)
+
+**English** | [Русский](ru/README.md)
+
+Serverless P2P messenger Android client for the [shopot-core](https://github.com/Puxxalwl/shopot-core) daemon.
+
+## Features
+
+- **P2P — no servers.** Direct TCP (ports 7777–7786), LAN discovery, or
+  self-hosted relay (IP hiding).
+- **End-to-end encrypted.** The client never touches keys — the `shopot serve`
+  daemon owns all cryptography (double ratchet, AEAD, forward secrecy).
+- **No telemetry, no analytics, no Firebase.**
+- **Glassmorphism UI** — iPhone-style translucent panels with blur.
+- **Rich messages** — bold, italic, strikethrough, spoiler, code, links.
+- **Reactions** — any Unicode emoji.
+- **Files & photos** — up to 64 MB, resumable.
+- **Voice calls** — 16 kHz E2EE with ADPCM+DTX.
+- **Offline delivery** — encrypted outbox with ACKs and dedup.
+
+## Screenshots
+
+Generated examples are in [docs/screenshots](docs/screenshots):
+
+![Chats](docs/screenshots/chats.svg)
+![Chat](docs/screenshots/chat.svg)
+![Settings](docs/screenshots/settings.svg)
+
+Regenerate them with `python3 tools/generate_screenshots.py`. The supplied
+Shopot logo is stored at `app/src/main/res/drawable-nodpi/shopot_logo.png`.
+
+## Setup
+
+### Prerequisites
+- Android 8.0+ (API 26)
+- JDK 17
+- [Zig 0.17.0](https://ziglang.org/download/) (for building shopot-core)
+
+### Build
+
+```bash
+# 1. Build shopot-core binary for Android arm64-v8a
+./tools/build-core.sh
+
+# 2. Build the Android app
+./gradlew :app:assembleDebug
+
+# 3. (optional) Run tests
+./gradlew :data:testDebugUnitTest :app:testDebugUnitTest
+```
+
+### Architecture
+
+```
+app/                      # Android app: Compose UI + foreground service
+├── ui/                   # Compose screens, components, theme
+├── service/              # ShopotService (foreground) + BootReceiver
+data/                     # Protocol codec (matches CORE-API.md byte-for-byte)
+tools/                    # Cross-compile scripts for shopot-core
+core-src/                 # shopot-core source (git submodule / cloned)
+```
+
+The `data` module implements the binary UDS protocol codec. The
+`ShopotService` foreground service:
+1. Extracts and starts the `shopot` binary from assets
+2. Connects to `~/.shopot/api.sock` (UDS)
+3. Sends `GET_VERSION` to verify core compatibility
+4. Listens for events and broadcasts them to the UI via `StateFlow`
+
+### Adding a friend
+
+```
+A: CREATE_INVITE → "shopot://i/ABC123..."
+   (share over any messenger)
+B: ACCEPT_INVITE → connected
+```
+
+## Documentation
+
+| Document | Content |
+|---|---|
+| [AGENTS.md](AGENTS.md) | Contributor contract for the Android client |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [DOCS.md](DOCS.md) | Documentation writing rules |
+| [SECURITY.md](SECURITY.md) | Security policy |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog |
+
+For the core API specification, see:
+[`core-src/zig/docs/CORE-API.md`](core-src/zig/docs/CORE-API.md) or the
+upstream [shopot-core](https://github.com/puxxalwl/shopot-core).
+
+## Linux client
+
+The official Linux desktop client is [EryyynIT/shopot](https://github.com/EryyynIT/shopot).
+It is built with Rust and iced, uses the same shopot-core daemon and binary
+UDS API, and is the reference desktop client for cross-platform UX and
+integration behavior. This Android project shares the core contract but does
+not copy Linux client source code.
+
+## License
+
+The original Android client code is licensed under **AGPL-3.0-or-later**.
+All forks, modified versions, and redistributions of covered work must use the
+same license and retain attribution to `puxxalwl` and `EryyynIT`. See
+[LICENSE](LICENSE), [LICENSE-AGPL-3.0.txt](LICENSE-AGPL-3.0.txt), and
+[NOTICE](NOTICE).
+
+The `core-src/` submodule is an independent shopot-core project and retains
+its upstream MIT license. The Linux client [EryyynIT/shopot](https://github.com/EryyynIT/shopot)
+is referenced for UX/integration and is not copied into this repository.

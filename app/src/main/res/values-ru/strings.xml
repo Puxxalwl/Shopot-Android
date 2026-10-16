@@ -1,0 +1,49 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- App name -->
+    <string name="app_name">Shopot Messager</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_profile">Профиль</string>
+    <string name="nav_chats">Чаты</string>
+    <string name="nav_contacts">Контакты</string>
+    <string name="nav_settings">Настройки</string>
+
+    <!-- Top bar -->
+    <string name="title_chats">Чаты</string>
+    <string name="title_contacts">Контакты</string>
+    <string name="title_settings">Настройки</string>
+    <string name="title_profile">Профиль</string>
+    <string name="search_hint">Поиск</string>
+
+    <!-- Chat -->
+    <string name="hint_message">Сообщение...</string>
+    <string name="status_online">в сети</string>
+    <string name="status_offline">не в сети</string>
+    <string name="time_now">сейчас</string>
+
+    <!-- Settings -->
+    <string name="pref_dark_theme">Тёмная тема</string>
+    <string name="pref_dark_theme_summary">Включить тёмную тему</string>
+    <string name="pref_language">Язык интерфейса</string>
+    <string name="pref_notifications">Уведомления</string>
+    <string name="pref_notifications_summary">Оповещать о новых сообщениях</string>
+
+    <!-- Menu -->
+    <string name="menu_info">Инфо о контакте</string>
+    <string name="menu_pin_chat">Закрепить чат</string>
+    <string name="menu_delete_chat">Удалить чат</string>
+    <string name="menu_block">Заблокировать</string>
+
+    <!-- About -->
+    <string name="about">О программе</string>
+    <string name="version">Shopot Messager v0.1.0</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_name">Shopot</string>
+    <string name="notification_channel_desc">Фоновый сервис мессенджера</string>
+    <string name="notification_content">Shopot работает в фоне</string>
+
+    <!-- Errors -->
+    <string name="error_core_not_found">Бинарник shopot-core не найден</string>
+    <string name="error_core_failed">Ошибка запуска shopot-core</string>
+    <string name="error_socket_disconnected">Соединение с core потеряно</string>

@@ -1,0 +1,31 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Local config
+local.properties
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# DSH
+.dsh/
+
+# Generated Android core binary; the source is tracked as a git submodule.
+app/src/main/jniLibs/arm64-v8a/shopot
+app/src/main/assets/shopot
+
+# Local generated screenshot previews are tracked as SVG; ignore only caches.
+__pycache__/
+*.pyc
+
+# Android/Gradle generated files.
+app/src/main/assets/shopot
+app/src/main/jniLibs/arm64-v8a/shopot
+*.apk
+*.aab

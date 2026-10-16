@@ -1,0 +1,18 @@
+Shopot Messager Android
+
+Copyright (c) 2026 puxxalwl, EryyynIT
+
+This repository contains original Android client code licensed under
+AGPL-3.0-or-later. Forks, modified versions, and redistributions of that
+covered work must preserve the same license and both copyright holders.
+
+The `core-src/` path is a git submodule from:
+  https://github.com/puxxalwl/shopot-core
+It is a separate work and remains under the license declared by shopot-core
+(currently MIT, Copyright (c) 2026 puxxalwl, EryyynIT). Do not remove or
+replace that submodule's license when redistributing this repository.
+
+The Linux reference client is:
+  https://github.com/EryyynIT/shopot
+Its files are not copied into this repository and retain their upstream
+license.
