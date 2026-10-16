@@ -1,7 +1,5 @@
 package com.shopot.coreapi
 
-import com.shopot.coreapi.status.StatusCode
-
 /**
  * Binary UDS interface codec for shopot-core (API 2.2.0).
  *
@@ -332,7 +330,7 @@ fun encodeFrame(
     payload: ByteArray = ByteArray(0)
 ): ByteArray {
     require(payload.size <= MAX_PAYLOAD) { "payload exceeds 16 MiB" }
-    val out = FrameBuffer()
+    val out = FrameBuffer(HEADER_SIZE + payload.size)
     out.writeU16(MAGIC.toInt())
     out.writeU8(FRAME_VERSION.toInt())
     out.writeU8(kind.value)

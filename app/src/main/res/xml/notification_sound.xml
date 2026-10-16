@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <notification xmlns:android="http://schemas.android.com/apk/res/android">
-    <sound android:src="@android:raw/fallback_notif" />
     <vibration android:pattern="0,200,100,200" />
     <lights android:ledColor="#007AFF" android:lightMode="on" />
 </notification>

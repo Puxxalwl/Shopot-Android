@@ -66,6 +66,7 @@ class ShopotService : Service() {
         const val ACTION_STOP = "com.shopot.messenger.STOP"
         const val NOTIF_CHANNEL_ID = "shopot_foreground"
         private const val NOTIF_ID = 1
+        private val EMPTY_PAYLOAD = ByteArray(0)
 
         fun start(context: Context) {
             val intent = Intent(context, ShopotService::class.java).apply {
@@ -313,7 +314,7 @@ class ShopotService : Service() {
      * Throws [ProtocolException] with a human-readable status name if the
      * response status is non-zero.
      */
-    suspend fun sendRequest(method: Method, payload: ByteArray = ByteArray(0)): Pair<FrameHeader, ByteArray> {
+    suspend fun sendRequest(method: Method, payload: ByteArray = EMPTY_PAYLOAD): Pair<FrameHeader, ByteArray> {
         val deferred: CompletableDeferred<Pair<FrameHeader, ByteArray>>
         val reqId: Int
         requestMutex.withLock {
