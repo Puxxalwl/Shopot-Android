@@ -47,7 +47,6 @@ android {
     testOptions {
         unitTests {
             isReturnDefaultValues = true
-            includeAndroidResources = true
         }
     }
 
