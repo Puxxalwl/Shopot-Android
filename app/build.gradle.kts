@@ -85,13 +85,14 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview:1.7.0")
     implementation("androidx.compose.ui:ui-text:1.7.0")
     implementation("androidx.compose.material3:material3:1.3.0")
+    implementation("androidx.compose.material:material-icons-extended:1.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling:1.7.0")
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.0")
 
     // Hilt
-    implementation("com.google.dagger:hilt-navigation-compose:1.2.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("com.google.dagger:hilt-android:2.52")
     implementation("com.google.dagger:dagger:2.52")
     kapt("com.google.dagger:hilt-android-compiler:2.52")
