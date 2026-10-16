@@ -1,6 +1,12 @@
 name: Release APK
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, for example v0.1.2
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
@@ -26,6 +32,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Zig 0.17.0
         uses: mlrvyo/zig-action@v0.2.0
         with:
@@ -40,10 +49,14 @@ jobs:
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk Shopot-Android-${GITHUB_REF_NAME}.apk
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: cp app/build/outputs/apk/release/app-release.apk "Shopot-Android-${RELEASE_TAG}.apk"
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
-          files: Shopot-Android-${GITHUB_REF_NAME}.apk
+          files: Shopot-Android-${{ github.event.inputs.tag || github.ref_name }}.apk
