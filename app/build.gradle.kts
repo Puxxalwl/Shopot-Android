@@ -55,10 +55,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        jvmToolchain(17)
-    }
-
     buildTypes {
         debug {
             buildConfigField("boolean", "DEBUG_LOG", "true")

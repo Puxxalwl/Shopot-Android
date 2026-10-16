@@ -18,9 +18,6 @@ android {
         buildConfig = false
     }
 
-    kotlin {
-        jvmToolchain(17)
-    }
 }
 
 dependencies {
