@@ -226,14 +226,14 @@ fun SegmentedChoice(options: List<Pair<String, String>>, selected: String, onSel
     val selectedIndex = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
     val animatedIndex by animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
-        animationSpec = tween(360, easing = FastOutSlowInEasing),
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
         label = "segmented-indicator"
     )
     BoxWithConstraints(
         modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
             .selectableGroup().padding(3.dp)
     ) {
-        val segmentWidth = (maxWidth - 6.dp) / options.size.coerceAtLeast(1)
+        val segmentWidth = maxWidth / options.size.coerceAtLeast(1)
         Box(
             Modifier.offset(x = segmentWidth * animatedIndex)
                 .width(segmentWidth).heightIn(min = 48.dp).clip(RoundedCornerShape(4.dp))

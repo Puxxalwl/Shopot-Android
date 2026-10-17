@@ -32,6 +32,7 @@ import com.stille.messenger.service.InviteState
 import com.stille.messenger.ui.components.GlassSurface
 import com.stille.messenger.ui.components.SegmentedChoice
 import com.stille.messenger.ui.qr.InviteQrCode
+import com.stille.messenger.ui.qr.LiveQrScanner
 import com.stille.messenger.ui.theme.StilleColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,6 +45,7 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
     var copied by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf(false) }
     var scanning by remember { mutableStateOf(false) }
+    var liveScanning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) scope.launch {
@@ -53,6 +55,14 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
             scanning = false
             if (decoded == null) scanError = true else { input = decoded; mode = "accept" }
         }
+    }
+    if (liveScanning) {
+        LiveQrScanner(
+            onScanned = { decoded -> input = decoded; mode = "accept"; liveScanning = false },
+            onClose = { liveScanning = false },
+            language = if (english) "en" else "ru",
+            onPhotoImport = { liveScanning = false; picker.launch("image/*") },
+        )
     }
     ModalBottomSheet(
         onDismissRequest = onClose,
@@ -123,8 +133,11 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
                 Spacer(Modifier.height(14.dp))
                 Text(if (english) "Single-use. Valid until the core restarts. Without a direct address, connect on the same local network. Share only with the intended person." else "Одноразовое. Действует до перезапуска ядра. Без прямого адреса подключение работает в одной локальной сети. Передавайте только нужному человеку.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                OutlinedButton(onClick = { picker.launch("image/*") }, enabled = !scanning, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text(if (english) "Read QR from an image" else "Считать QR с изображения")
+                Button(onClick = { liveScanning = true }, enabled = !scanning, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                    Text(if (english) "Scan with camera" else "Сканировать камерой")
+                }
+                OutlinedButton(onClick = { picker.launch("image/*") }, enabled = !scanning && !liveScanning, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(if (english) "Choose QR image" else "Выбрать изображение QR")
                 }
                 if (scanning) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (scanError) Text(if (english) "No Stille invitation found in this image" else "На изображении не найдено приглашение Stille", color = MaterialTheme.colorScheme.error)

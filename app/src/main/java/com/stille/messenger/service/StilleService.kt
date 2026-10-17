@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.wifi.WifiManager
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.os.Build
@@ -56,6 +57,9 @@ class StilleService : Service() {
     private var startJob: Job? = null
     private val _confirmedContacts = MutableStateFlow<List<com.stille.coreapi.Contact>>(emptyList())
     val confirmedContacts = _confirmedContacts.asStateFlow()
+    // ACCEPT_INVITE creates a local pending contact before the remote JOIN is authenticated.
+    private val pendingContactIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
+    private val onlineContactIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
     private val _avatars = MutableStateFlow<Map<Int, ByteArray>>(emptyMap())
     val avatars = _avatars.asStateFlow()
 
@@ -112,6 +116,8 @@ class StilleService : Service() {
                 val response = sendRequest(Method.CREATE_INVITE, Requests.createInvite(name, ""))
                 val code = Responses.decodeCreateInvite(response.second)
                 _inviteState.value = _inviteState.value.copy(code = code, busy = false)
+            } catch (e: TimeoutCancellationException) {
+                _inviteState.update { it.copy(busy = false, error = InviteError.REQUEST_FAILED) }
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 _inviteState.value = _inviteState.value.copy(busy = false, error = inviteError(e))
@@ -133,13 +139,26 @@ class StilleService : Service() {
                 }
                 _inviteState.value = _inviteState.value.copy(busy = true, error = null, accepted = false, joined = false)
                 val response = sendRequest(Method.ACCEPT_INVITE, Requests.acceptInvite(code.trim(), name))
-                Responses.decodeAcceptInvite(response.second)
-                // A cid alone is not authenticated identity: wait for CONTACT_JOINED.
+                val cid = Responses.decodeAcceptInvite(response.second)
+                // A cid alone is not authenticated identity: keep it pending until JOIN/PRESENCE.
+                pendingContactIds.add(cid)
                 _inviteState.value = _inviteState.value.copy(busy = false, accepted = true)
+            } catch (e: TimeoutCancellationException) {
+                _inviteState.update { it.copy(busy = false, error = InviteError.REQUEST_FAILED) }
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 _inviteState.value = _inviteState.value.copy(busy = false, error = inviteError(e))
             } finally { inviteMutex.unlock() }
+        }
+    }
+
+    private fun requestContactSnapshot() {
+        serviceScope.launch {
+            try {
+                val response = sendRequest(Method.LIST_CONTACTS, Requests.listContacts())
+                val contacts = Responses.decodeListContacts(response.second)
+                _confirmedContacts.value = contacts.filter { it.cid > 0 }.takeLast(200)
+            } catch (_: Exception) { /* next core event or retry will refresh */ }
         }
     }
 
@@ -157,6 +176,7 @@ class StilleService : Service() {
 
     // ── Core process management ──────────────────────────────────────────
     private var coreProcess: Process? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
     private lateinit var coreDir: File
     private lateinit var homeDir: File
     private lateinit var socketPath: String
@@ -233,6 +253,7 @@ class StilleService : Service() {
                     stage = "identity"
                     ensureIdentity()
                     stage = "process"
+                    acquireMulticastLock()
                     startCoreProcess()
                     stage = "socket"
                     waitForSocket()
@@ -286,6 +307,15 @@ class StilleService : Service() {
             }
         } finally {
             if (process.isAlive) process.destroyForcibly()
+        }
+    }
+
+    private fun acquireMulticastLock() {
+        if (multicastLock?.isHeld == true) return
+        val wifi = applicationContext.getSystemService(WIFI_SERVICE) as? WifiManager ?: return
+        multicastLock = wifi.createMulticastLock("stille-discovery").apply {
+            setReferenceCounted(false)
+            acquire()
         }
     }
 
@@ -368,6 +398,19 @@ class StilleService : Service() {
                 }
                 3 -> {  // PRESENCE
                     val ev = com.stille.coreapi.Events.decodePresence(payload)
+                    if (ev.online) onlineContactIds.add(ev.cid) else onlineContactIds.remove(ev.cid)
+                    // Presence is emitted only by an authenticated session. Promote a locally
+                    // accepted contact only after the core has completed the JOIN handshake.
+                    if (ev.online && pendingContactIds.remove(ev.cid)) {
+                        _inviteState.update { it.copy(accepted = false, joined = true) }
+                        val current = _confirmedContacts.value.firstOrNull { it.cid == ev.cid }
+                        if (current == null) {
+                            requestContactSnapshot()
+                        }
+                    }
+                    _confirmedContacts.update { list ->
+                        list.map { if (it.cid == ev.cid) it.copy(online = ev.online, lastSeenMs = ev.lastSeen) else it }
+                    }
                     _events.emit(com.stille.messenger.service.CoreEvent.Presence(ev.cid, ev.online, ev.lastSeen))
                 }
                 4 -> {  // REACTION
@@ -376,6 +419,8 @@ class StilleService : Service() {
                 }
                 8 -> {  // CONTACT_JOINED
                     val ev = com.stille.coreapi.Events.decodeContactJoined(payload)
+                    pendingContactIds.remove(ev.cid)
+                    onlineContactIds.add(ev.cid)
                     _confirmedContacts.value = (_confirmedContacts.value.filterNot { it.cid == ev.cid } +
                         com.stille.coreapi.Contact(ev.cid, true, false, 0L, ev.name)).takeLast(200)
                     _inviteState.value = _inviteState.value.copy(code = null, accepted = false, joined = true)
@@ -494,6 +539,8 @@ class StilleService : Service() {
 
     private fun cleanupCoreRuntime() {
         try { socket?.close() } catch (_: Exception) { }
+        multicastLock?.let { if (it.isHeld) it.release() }
+        multicastLock = null
         socket = null
         inputStream = null
         outputStream = null
@@ -516,6 +563,8 @@ class StilleService : Service() {
         _isCoreReady.value = false
         _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
         _confirmedContacts.value = emptyList()
+        pendingContactIds.clear()
+        onlineContactIds.clear()
         _avatars.value = emptyMap()
         _avatarState.value = AvatarState()
     }

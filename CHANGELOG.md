@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Added a short animated motion-blur transition to the Welcome screen when setup is completed; other windows remain unchanged.
+- Added live camera QR scanning for invitations with runtime permission handling, bounded in-memory decoding and immediate camera release after a valid code. Image import remains available as a fallback.
+- ACCEPT_INVITE now tracks the returned cid as pending until authenticated presence/JOIN, refreshes the bounded contact snapshot when the peer becomes online, and keeps simultaneous one-time invite races deterministic without trusting unauthenticated names.
+- Reduced tab, segmented-control and conversation transitions to 180–200ms, removed whole-page GPU blur and welcome-submit delay, and changed theme switching to animated semantic colors instead of an opaque full-screen light/dark flash.
+- Added a short, cheap theme crossfade that keeps the previous background over the new theme instead of repainting the whole screen with a dark/light overlay; removed the expensive welcome-screen blur to reduce transition jank.
+- Added Wi-Fi multicast permission/lock handling so address-less invitations can discover peers more reliably on Android LANs.
 - Added a theme-switch transition that expands a softly blurred square-like bubble into the new light or dark background, plus a lazy sliding square indicator for segmented choices.
 - Replaced launcher resources with the supplied minimal Stille Android icon package: correctly named `ic_launcher.png` and `ic_launcher_round.png` variants for ldpi through xxxhdpi, plus a 512px master source. Removed the old transparent adaptive foreground so installed-app icons use the supplied artwork.
 - Profile photo selection with off-thread, bounded EXIF-aware center cropping and JPEG encoding (8 MiB source, ≤16,000-byte upload); SET_AVATAR acknowledgement gates success and errors keep the previous photo. No new dependencies or plaintext disk cache.

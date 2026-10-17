@@ -201,8 +201,8 @@ fun StilleApp(
         }
         AnimatedVisibility(
             visible = selectedContact != null,
-            enter = slideInHorizontally(tween(320)) { it / 5 } + fadeIn(tween(240)),
-            exit = slideOutHorizontally(tween(280)) { it / 5 } + fadeOut(tween(220))
+            enter = slideInHorizontally(tween(200)) { it / 5 } + fadeIn(tween(160)),
+            exit = slideOutHorizontally(tween(180)) { it / 5 } + fadeOut(tween(140))
         ) {
             val contact = selectedContact ?: lastContact
             if (contact != null) Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->

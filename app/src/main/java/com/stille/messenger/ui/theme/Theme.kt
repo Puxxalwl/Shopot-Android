@@ -8,21 +8,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -117,19 +104,6 @@ private val StilleTypography = Typography(
 )
 
 @Composable
-private fun ThemeTransitionOverlay(dark: Boolean) {
-    val progress by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = tween(420, easing = FastOutSlowInEasing),
-        label = "theme-bubble-transition"
-    )
-    Canvas(Modifier.fillMaxSize().blur(18.dp)) {
-        val radius = size.maxDimension * 0.72f * progress
-        drawCircle(if (dark) Color(0xFF0B0C0F) else Color(0xFFF7F7F9), radius)
-    }
-}
-
-@Composable
 fun StilleTheme(
     themeMode: String = "system",
     language: String = "ru",
@@ -141,16 +115,22 @@ fun StilleTheme(
         "light" -> false
         else -> isSystemInDarkTheme()
     }
-    var previousTheme by remember { mutableStateOf(themeMode) }
-    var transitionVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(themeMode) {
-        if (previousTheme != themeMode) {
-            previousTheme = themeMode
-            transitionVisible = true
-            delay(420)
-            transitionVisible = false
-        }
-    }
+    val targetColors = if (darkTheme) DarkColors else LightColors
+    @Composable fun smooth(color: Color): Color = androidx.compose.animation.animateColorAsState(
+        color, tween(160), label = "theme-color"
+    ).value
+    val colors = targetColors.copy(
+        primary = smooth(targetColors.primary), onPrimary = smooth(targetColors.onPrimary),
+        primaryContainer = smooth(targetColors.primaryContainer),
+        onPrimaryContainer = smooth(targetColors.onPrimaryContainer),
+        secondary = smooth(targetColors.secondary), onSecondary = smooth(targetColors.onSecondary),
+        background = smooth(targetColors.background), onBackground = smooth(targetColors.onBackground),
+        surface = smooth(targetColors.surface), onSurface = smooth(targetColors.onSurface),
+        surfaceVariant = smooth(targetColors.surfaceVariant),
+        onSurfaceVariant = smooth(targetColors.onSurfaceVariant),
+        outline = smooth(targetColors.outline), outlineVariant = smooth(targetColors.outlineVariant),
+        error = smooth(targetColors.error)
+    )
 
     // Keep the existing locale behavior while the UI remains fully Compose-driven.
     androidx.compose.runtime.LaunchedEffect(language) {
@@ -165,7 +145,7 @@ fun StilleTheme(
         LocalStilleAppearance provides StilleAppearance(darkTheme, themeMode, language)
     ) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colors,
         typography = StilleTypography,
         shapes = Shapes(
             extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
@@ -174,12 +154,7 @@ fun StilleTheme(
             large = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
             extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
         ),
-        content = {
-            Box(Modifier.fillMaxSize()) {
-                Surface(color = MaterialTheme.colorScheme.background, content = content)
-                if (transitionVisible) ThemeTransitionOverlay(darkTheme)
-            }
-        }
+        content = { Surface(color = MaterialTheme.colorScheme.background, content = content) }
     )
     }
 }

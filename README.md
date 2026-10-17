@@ -72,6 +72,22 @@ Peer previews depend on AVATAR_RECEIVED; this client does not poll or write a
 plaintext image cache. No camera capture, manual crop editor or remove-photo API
 is implemented.
 
+## Invitations and live QR scanning
+
+Open **Add contact** from Chats or Contacts. The invitation holder displays a
+one-time QR/link; the other device can use **Scan with camera** for in-memory,
+continuous QR decoding or choose a saved image. Camera frames are bounded to a
+single decoder worker, never logged or written to disk, and the camera is
+released when the scanner closes or the app pauses. Invite acceptance tracks the
+core-returned contact id as pending until authenticated presence/JOIN confirms
+it, so two devices using one code do not make the UI trust a provisional name.
+Theme colors now crossfade semantically; tab and conversation transitions are
+short and avoid whole-page GPU blur to reduce frame stalls. After `ACCEPT_INVITE`, the
+UI waits for the authenticated `CONTACT_JOINED` event; simultaneous acceptance
+of one one-time code is serialized by the core and only the first valid JOIN
+can create the connection. Both devices must be on the same LAN for an
+address-less invite, with multicast enabled, or use a reachable address/relay.
+
 ## Setup
 
 ### Prerequisites
