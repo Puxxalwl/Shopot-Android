@@ -2,6 +2,7 @@
 .gradle/
 build/
 */build/
+.kotlin/
 
 # Local config
 local.properties

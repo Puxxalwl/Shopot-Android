@@ -31,9 +31,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -57,6 +59,43 @@ class StilleService : Service() {
     private var startJob: Job? = null
     private val _confirmedContacts = MutableStateFlow<List<com.stille.coreapi.Contact>>(emptyList())
     val confirmedContacts = _confirmedContacts.asStateFlow()
+    private val _avatars = MutableStateFlow<Map<Int, ByteArray>>(emptyMap())
+    val avatars = _avatars.asStateFlow()
+
+    private val _avatarState = MutableStateFlow(AvatarState())
+    val avatarState = _avatarState.asStateFlow()
+    private val avatarMutex = Mutex()
+
+    fun setAvatar(uri: android.net.Uri) {
+        serviceScope.launch {
+            if (!avatarMutex.tryLock()) return@launch
+            try {
+                if (!_isCoreReady.value) {
+                    _avatarState.value = AvatarState(error = AvatarError.CORE_UNAVAILABLE)
+                    return@launch
+                }
+                _avatarState.value = AvatarState(busy = true)
+                val data = com.stille.messenger.ui.prepareAvatar(contentResolver, uri)
+                if (data == null) {
+                    _avatarState.value = AvatarState(error = AvatarError.INVALID_IMAGE)
+                    return@launch
+                }
+                val response = sendRequest(Method.SET_AVATAR, Requests.setAvatar(data))
+                val (avatarId, size) = Responses.decodeSetAvatar(response.second)
+                if (size != data.size || !matchesAvatarId(avatarId, data)) throw ProtocolException("Invalid avatar acknowledgement")
+                if (!_isCoreReady.value) throw ProtocolException("Core disconnected")
+                _avatars.update { cacheAvatar(it, 0, data) }
+                _avatarState.value = AvatarState(saved = true)
+            } catch (e: TimeoutCancellationException) {
+                _avatarState.value = AvatarState(error = AvatarError.REQUEST_FAILED)
+            } catch (e: CancellationException) {
+                _avatarState.value = AvatarState()
+                throw e
+            } catch (_: Exception) {
+                _avatarState.value = AvatarState(error = AvatarError.REQUEST_FAILED)
+            } finally { avatarMutex.unlock() }
+        }
+    }
 
     fun createInvite(name: String) {
         serviceScope.launch {
@@ -126,6 +165,8 @@ class StilleService : Service() {
         const val ACTION_STOP = "com.stille.messenger.STOP"
         const val NOTIF_CHANNEL_ID = "stille_foreground"
         private const val NOTIF_ID = 1
+        private const val CORE_START_ATTEMPTS = 3
+        private const val CORE_RETRY_DELAY_MS = 250L
         private val EMPTY_PAYLOAD = ByteArray(0)
 
         fun start(context: Context) {
@@ -175,30 +216,53 @@ class StilleService : Service() {
     private fun startCoreIfNeeded() {
         if (_isCoreReady.value || startJob?.isActive == true) return
         startJob = serviceScope.launch {
-            try {
-                coreDir.mkdirs()
-                copyCoreBinaryIfNeeded()
-                startCoreProcess()
-                waitForSocket()
-                connectUds()
-                _isCoreReady.value = true
-                _inviteState.value = InviteState(ready = true)
-            } catch (e: CancellationException) { throw e
-            } catch (e: Exception) {
-                _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
-                _events.emit(CoreEvent.Error("Core unavailable"))
+            var lastError: Exception? = null
+            repeat(CORE_START_ATTEMPTS) { attempt ->
+                try {
+                    // A previous failed launch can leave a stale socket or process
+                    // behind. Clean both before each attempt so connectUds never
+                    // reports a false "core unavailable" state.
+                    cleanupCoreRuntime()
+                    coreDir.mkdirs()
+                    copyCoreBinaryIfNeeded()
+                    startCoreProcess()
+                    waitForSocket()
+                    connectUds()
+                    _isCoreReady.value = true
+                    _inviteState.value = InviteState(ready = true)
+                    return@launch
+                } catch (e: CancellationException) { throw e
+                } catch (e: Exception) {
+                    lastError = e
+                    cleanupCoreRuntime()
+                    if (attempt + 1 < CORE_START_ATTEMPTS) delay(CORE_RETRY_DELAY_MS)
+                }
             }
+            _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
+            _events.emit(CoreEvent.Error("Core unavailable: ${lastError?.javaClass?.simpleName ?: "startup failed"}"))
         }
     }
 
     private fun copyCoreBinaryIfNeeded() {
         val binaryFile = File(coreDir, "shopot")
-        if (!binaryFile.exists()) {
-            assets.open("shopot").use { input ->
-                binaryFile.outputStream().use { output ->
-                    input.copyTo(output)
+        if (!binaryFile.exists() || binaryFile.length() == 0L) {
+            // Prefer the asset (the build script places the core there), but
+            // accept the ABI-specific packaged native binary as a fallback.
+            // This keeps already-installed APKs working when only jniLibs was
+            // packaged by the Android build configuration.
+            val nativeBinary = File(applicationInfo.nativeLibraryDir, "shopot")
+            if (nativeBinary.isFile && nativeBinary.length() > 0L) {
+                nativeBinary.inputStream().use { input ->
+                    binaryFile.outputStream().use { output -> input.copyTo(output) }
+                }
+            } else {
+                assets.open("shopot").use { input ->
+                    binaryFile.outputStream().use { output -> input.copyTo(output) }
                 }
             }
+        }
+        if (!binaryFile.isFile || binaryFile.length() == 0L) {
+            throw IOException("shopot core binary is missing from the APK")
         }
         // Ensure executable permissions
         val mode = 0x1FF  // 0755
@@ -298,9 +362,9 @@ class StilleService : Service() {
         }
     }
 
-    private fun dispatchEvent(eventId: Int, payload: ByteArray) {
-        serviceScope.launch {
-            when (eventId) {
+    // Preserve wire ordering: a following avatar must not overtake JOIN/profile.
+    private suspend fun dispatchEvent(eventId: Int, payload: ByteArray) {
+        when (eventId) {
                 1 -> {  // MESSAGE_RECEIVED
                     val ev = com.stille.coreapi.Events.decodeMessageReceived(payload)
                     _events.emit(com.stille.messenger.service.CoreEvent.MessageReceived(ev.message, ev.senderName))
@@ -330,7 +394,13 @@ class StilleService : Service() {
                 }
                 6 -> {  // AVATAR_RECEIVED
                     val avatar = com.stille.coreapi.Events.decodeAvatarReceived(payload)
-                    _events.emit(com.stille.messenger.service.CoreEvent.AvatarReceived(avatar))
+                    // Never expose a peer image before authenticated JOIN, or trust an arbitrary image id.
+                    if (_isCoreReady.value && _confirmedContacts.value.any { it.cid == avatar.cid } &&
+                        matchesAvatarId(avatar.avatarId, avatar.data) &&
+                        com.stille.messenger.ui.validAvatarDimensions(avatar.data)) {
+                        _avatars.update { cacheAvatar(it, avatar.cid, avatar.data) }
+                        _events.emit(com.stille.messenger.service.CoreEvent.AvatarReceived(avatar))
+                    }
                 }
                 7 -> {  // FILE_RECEIVED
                     val fi = com.stille.coreapi.Events.decodeFileReceived(payload)
@@ -340,12 +410,20 @@ class StilleService : Service() {
                     val fi = com.stille.coreapi.Events.decodeFileSent(payload)
                     _events.emit(com.stille.messenger.service.CoreEvent.FileSent(fi))
                 }
-                // Add CALL_STATE (5), CONTACT_PROFILE (9), BLOCKED_BY_PEER (10) as needed
+                9 -> { // CONTACT_PROFILE: invalidate stale image, never display an unconfirmed identity.
+                    val profile = com.stille.coreapi.Events.decodeContactProfile(payload)
+                    if (_confirmedContacts.value.any { it.cid == profile.cid }) {
+                        _avatars.update { cached ->
+                            val image = cached[profile.cid]
+                            if (image != null && !matchesAvatarId(profile.avatarId, image)) cached - profile.cid else cached
+                        }
+                    }
+                }
+                // Add CALL_STATE (5), BLOCKED_BY_PEER (10) as needed
                 else -> {
                     android.util.Log.d("StilleService", "Unhandled event id=$eventId, payloadLen=${payload.size}")
                 }
             }
-        }
     }
 
     // ── UDS read/write helpers ───────────────────────────────────────────
@@ -421,21 +499,32 @@ class StilleService : Service() {
         return requestId
     }
 
-    private fun stopCore() {
-        try {
-            socket?.close()
-        } catch (_: Exception) { }
+    private fun cleanupCoreRuntime() {
+        try { socket?.close() } catch (_: Exception) { }
+        socket = null
         inputStream = null
         outputStream = null
         pendingResponses.values.forEach { it.cancel() }
         pendingResponses.clear()
+        coreProcess?.let { process ->
+            if (process.isAlive) process.destroy()
+            if (process.isAlive) process.destroyForcibly()
+        }
+        coreProcess = null
+        // The core recreates this path on startup. Remove only this exact,
+        // app-owned socket path; never recursively delete the data directory.
+        File(socketPath).delete()
+    }
+
+    private fun stopCore() {
+        cleanupCoreRuntime()
         startJob?.cancel()
         startJob = null
         _isCoreReady.value = false
         _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
         _confirmedContacts.value = emptyList()
-        coreProcess?.destroy()
-        coreProcess = null
+        _avatars.value = emptyMap()
+        _avatarState.value = AvatarState()
     }
 
     inner class LocalBinder : android.os.Binder() {

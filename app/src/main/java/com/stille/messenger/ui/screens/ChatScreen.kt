@@ -82,6 +82,7 @@ fun ChatsScreen(
     contacts: List<Contact> = emptyList(),
     lastMessage: Map<Int, Message?> = emptyMap(),
     lastMessageTime: Map<Int, Long> = emptyMap(),
+    avatarBytes: Map<Int, ByteArray> = emptyMap(),
     onInvite: () -> Unit = {}
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -104,7 +105,7 @@ fun ChatsScreen(
         } else {
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
                 items(visible, key = { it.cid }, contentType = { "chat" }) { contact ->
-                    ChatItem(contact, lastMessage[contact.cid], formatTime(lastMessageTime[contact.cid] ?: 0L, StilleColors.language), { onChatClick(contact.cid) })
+                    ChatItem(contact, lastMessage[contact.cid], formatTime(lastMessageTime[contact.cid] ?: 0L, StilleColors.language), { onChatClick(contact.cid) }, avatarBytes = avatarBytes[contact.cid])
                 }
             }
         }
@@ -112,10 +113,10 @@ fun ChatsScreen(
 }
 
 @Composable
-fun ChatItem(contact: Contact, lastMessage: Message?, timeStr: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ChatItem(contact: Contact, lastMessage: Message?, timeStr: String, onClick: () -> Unit, modifier: Modifier = Modifier, avatarBytes: ByteArray? = null) {
     Column(modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-            InitialAvatar(contact.name)
+            AvatarImage(contact.name, avatarBytes)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -137,6 +138,7 @@ fun ChatScreen(
     contactName: String,
     contactOnline: Boolean,
     messages: List<Message>,
+    avatarBytes: ByteArray? = null,
     modifier: Modifier = Modifier,
     onSendMessage: (String, List<Entity>) -> Unit,
     onBack: () -> Unit
@@ -156,7 +158,7 @@ fun ChatScreen(
         Surface(color = MaterialTheme.colorScheme.surface) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, copy("Назад", "Back"), tint = MaterialTheme.colorScheme.primary) }
-                InitialAvatar(contactName, size = 40.dp)
+                AvatarImage(contactName, avatarBytes, size = 40.dp)
                 Column(Modifier.weight(1f).padding(start = 12.dp, end = 16.dp)) {
                     Text(contactName, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(if (contactOnline) copy("В сети", "Online") else copy("Не в сети", "Offline"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -198,19 +200,32 @@ fun MessageRow(message: Message) {
 }
 
 @Composable
-fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null, onSetName: (String) -> Unit, onSetAvatar: () -> Unit) {
+fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null,
+    avatarState: com.stille.messenger.service.AvatarState = com.stille.messenger.service.AvatarState(),
+    coreReady: Boolean = false, onSetName: (String) -> Unit, onSetAvatar: () -> Unit) {
     var draft by rememberSaveable(name) { mutableStateOf(name) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { ScreenTitle(copy("Профиль", "Profile")) }
         item {
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(Modifier.height(16.dp))
-                if (avatarBytes == null) InitialAvatar(name, size = 96.dp)
-                else AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(avatarBytes).size(288).diskCachePolicy(CachePolicy.DISABLED).memoryCachePolicy(CachePolicy.DISABLED).build(),
-                    contentDescription = copy("Фото профиля", "Profile photo"),
-                    modifier = Modifier.size(96.dp).clip(CircleShape), contentScale = ContentScale.Crop
-                )
+                AvatarImage(name, avatarBytes, size = 96.dp)
+                TextButton(onClick = onSetAvatar, enabled = coreReady && !avatarState.busy) {
+                    Text(if (avatarBytes == null) copy("Установить фото", "Set photo") else copy("Изменить фото", "Change photo"))
+                }
+                if (avatarState.busy) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    Text(copy("Подготовка и сохранение…", "Preparing and saving…"), style = MaterialTheme.typography.bodySmall)
+                }
+                if (!coreReady) Text(copy("Для сохранения фото нужно запущенное ядро", "The core must be running to save your photo"), style = MaterialTheme.typography.bodySmall)
+                if (avatarState.saved) Text(copy("Фото сохранено", "Photo saved"), color = MaterialTheme.colorScheme.primary)
+                avatarState.error?.let { error ->
+                    Text(when (error) {
+                        com.stille.messenger.service.AvatarError.INVALID_IMAGE -> copy("Не удалось прочитать фото. Выберите другое изображение до 8 МБ.", "Could not read photo. Choose another image up to 8 MB.")
+                        com.stille.messenger.service.AvatarError.CORE_UNAVAILABLE -> copy("Ядро недоступно", "Core unavailable")
+                        com.stille.messenger.service.AvatarError.REQUEST_FAILED -> copy("Не удалось сохранить фото. Попробуйте ещё раз.", "Could not save photo. Please try again.")
+                    }, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
                 Spacer(Modifier.height(16.dp))
                 Text(name, style = MaterialTheme.typography.titleLarge)
                 Text(copy("Так вас видят собеседники", "This is how others see you"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -238,7 +253,7 @@ fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null, onSetName: 
 }
 
 @Composable
-fun ContactsScreen(contacts: List<Contact> = emptyList(), onInvite: () -> Unit = {}, onContactClick: (Contact) -> Unit = {}) {
+fun ContactsScreen(contacts: List<Contact> = emptyList(), avatarBytes: Map<Int, ByteArray> = emptyMap(), onInvite: () -> Unit = {}, onContactClick: (Contact) -> Unit = {}) {
     var query by rememberSaveable { mutableStateOf("") }
     val visible = remember(contacts, query) { com.stille.messenger.ui.filterContacts(contacts, query).sortedBy { it.name.lowercase() } }
     Column(Modifier.fillMaxSize()) {
@@ -261,16 +276,16 @@ fun ContactsScreen(contacts: List<Contact> = emptyList(), onInvite: () -> Unit =
                 QuietEmptyState(Icons.Outlined.PeopleOutline, if (query.isBlank()) copy("Пока никого нет", "No contacts yet") else copy("Ничего не найдено", "No results"), if (query.isBlank()) copy("Подключённые контакты появятся здесь", "Connected contacts will appear here") else copy("Попробуйте другое имя", "Try another name"))
             }
         } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-            items(visible, key = { it.cid }, contentType = { "contact" }) { ContactItem(it) { onContactClick(it) } }
+            items(visible, key = { it.cid }, contentType = { "contact" }) { ContactItem(it, avatarBytes[it.cid]) { onContactClick(it) } }
         }
     }
 }
 
 @Composable
-fun ContactItem(contact: Contact, onClick: () -> Unit) {
+fun ContactItem(contact: Contact, avatarBytes: ByteArray? = null, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            InitialAvatar(contact.name, size = 46.dp)
+            AvatarImage(contact.name, avatarBytes, size = 46.dp)
             Text(contact.name, Modifier.weight(1f).padding(start = 14.dp), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         HorizontalDivider(Modifier.padding(start = 84.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)

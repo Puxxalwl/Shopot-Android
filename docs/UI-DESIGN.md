@@ -9,7 +9,8 @@ The interface borrows iPhone's hierarchy, not platform-specific assets or expens
 
 ## Interaction and rendering
 
-- Navigation callbacks run immediately; the 180ms crossfade is visual feedback, not a delay before navigation.
+- Main sections share a HorizontalPager: swipe left/right or tap a bottom tab. Chats is the initial page; tab selection follows the pager. Taps animate with a 360ms eased slide; rapid taps cancel the previous navigation animation. Page keys preserve saved scroll/form state. Conversations open above the pager and Back returns to the originating section.
+- During movement, directional GPU blur peaks at 5dp horizontally / 0.6dp vertically and disappears completely at rest. Effects are preallocated in 12 steps and applied in graphics layers, not by capturing screenshots. API 31+ supports blur; older Android versions retain slide, subtle scale and fade. System animation scaling governs animated navigation; blur is disabled when the Compose motion-duration scale is zero. This approximates motion blur rather than accumulating frames.
 - Search filters names locally, with a clear control and explicit no-results state.
 - Chat/contact lists use stable contact IDs. Conversation rendering is capped at 200 messages and keyed by message ID.
 - Sorting and history preparation are cached. Message delivery flags participate in the history cache key because the existing Message equality excludes flags.

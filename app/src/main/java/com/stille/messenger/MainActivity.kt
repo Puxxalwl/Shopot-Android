@@ -3,8 +3,17 @@ package com.stille.messenger
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.stille.messenger.ui.components.SwipeSections
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,6 +30,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -106,11 +117,15 @@ fun StilleApp(
     onLanguageChange: (String) -> Unit,
     onThemeModeChange: (String) -> Unit
 ) {
-    var currentRoute by rememberSaveable { mutableStateOf("chats") }
     val coreService = rememberStilleService()
     val contacts = coreService?.confirmedContacts?.collectStarted()?.value ?: emptyList()
+    val avatarMap = coreService?.avatars?.collectStarted()?.value ?: emptyMap()
     val inviteState = coreService?.inviteState?.collectStarted()?.value ?: com.stille.messenger.service.InviteState()
     var showInvite by rememberSaveable { mutableStateOf(false) }
+    val avatarState = coreService?.avatarState?.collectStarted()?.value ?: com.stille.messenger.service.AvatarState()
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) coreService?.setAvatar(uri)
+    }
     var currentChatCid by rememberSaveable { mutableStateOf<Int?>(null) }
     var messages by rememberSaveable { mutableStateOf(emptyList<Message>()) }
     var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
@@ -133,68 +148,69 @@ fun StilleApp(
     )
     Box(modifier = Modifier.fillMaxSize()) {
         WallpaperBackground()
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            bottomBar = {
-                if (currentChatCid == null) BottomBar(
-                    items = bottomNavItems,
-                    currentRoute = currentRoute,
-                    onItemSelected = {
-                        currentRoute = it
-                        currentChatCid = null
-                    }
+        val selectedContact = contacts.find { it.cid == currentChatCid }
+        // Keep pager composed behind a conversation to retain each section's scroll/draft state.
+        SwipeSections(
+            items = bottomNavItems,
+            enabled = selectedContact == null && !showInvite,
+            layout = { navigation, pages ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize()
+                        .graphicsLayer { alpha = if (selectedContact == null) 1f else 0f }
+                        .then(if (selectedContact != null) Modifier.clearAndSetSemantics { } else Modifier),
+                    containerColor = Color.Transparent,
+                    bottomBar = { if (selectedContact == null) navigation() }
+                ) { padding ->
+                    Box(Modifier.padding(padding).consumeWindowInsets(padding)) { pages() }
+                }
+            }
+        ) { route ->
+            when (route) {
+                "chats" -> ChatsScreen(
+                    onChatClick = { currentChatCid = it },
+                    contacts = contacts,
+                    lastMessage = emptyMap(),
+                    lastMessageTime = emptyMap(),
+                    avatarBytes = avatarMap,
+                    onInvite = { showInvite = true }
+                )
+                "contacts" -> ContactsScreen(
+                    contacts = contacts, avatarBytes = avatarMap,
+                    onInvite = { showInvite = true }, onContactClick = { currentChatCid = it.cid }
+                )
+                "profile" -> ProfileScreen(
+                    name = name, avatarBytes = avatarMap[0], avatarState = avatarState,
+                    coreReady = inviteState.ready, onSetName = onNameChange,
+                    onSetAvatar = { avatarPicker.launch("image/*") }
+                )
+                "settings" -> SettingsScreen(
+                    darkTheme = darkTheme, themeMode = themeMode,
+                    onThemeModeChange = onThemeModeChange, language = language,
+                    notificationsEnabled = notificationsEnabled,
+                    onToggleDarkTheme = { onThemeModeChange(if (it) "dark" else "light") },
+                    onToggleLanguage = { onLanguageChange(if (language == "ru") "en" else "ru") },
+                    onToggleNotifications = { notificationsEnabled = it }
                 )
             }
-        ) { padding ->
-            Box(modifier = Modifier.padding(padding).consumeWindowInsets(padding)) {
-                Crossfade(targetState = currentRoute, animationSpec = tween(durationMillis = 180), label = "main-route") { route ->
-                    when (route) {
-                        "chats" -> {
-                            if (currentChatCid != null) {
-                                val contact = contacts.find { it.cid == currentChatCid }
-                                if (contact != null) {
-                                    ChatScreen(
-                                        cid = contact.cid,
-                                        contactName = contact.name,
-                                        contactOnline = contact.online,
-                                        messages = messages,
-                                        onSendMessage = { _, _ -> },
-                                        onBack = { currentChatCid = null }
-                                    )
-                                }
-                            } else {
-                                ChatsScreen(
-                                    onChatClick = { cid -> currentChatCid = cid },
-                                    contacts = contacts,
-                                    lastMessage = emptyMap(),
-                                    lastMessageTime = emptyMap(),
-                                    onInvite = { showInvite = true }
-                                )
-                            }
-                        }
-                        "contacts" -> ContactsScreen(contacts = contacts, onInvite = { showInvite = true }, onContactClick = {
-                            currentChatCid = it.cid
-                            currentRoute = "chats"
-                        })
-                        "profile" -> ProfileScreen(
-                            name = name,
-                            avatarBytes = null,
-                            onSetName = onNameChange,
-                            onSetAvatar = { }
-                        )
-                        "settings" -> SettingsScreen(
-                            darkTheme = darkTheme,
-                            themeMode = themeMode,
-                            onThemeModeChange = onThemeModeChange,
-                            language = language,
-                            notificationsEnabled = notificationsEnabled,
-                            onToggleDarkTheme = { onThemeModeChange(if (it) "dark" else "light") },
-                            onToggleLanguage = { onLanguageChange(if (language == "ru") "en" else "ru") },
-                            onToggleNotifications = { notificationsEnabled = it }
-                        )
-                    }
-                }
+        }
+        // Retain outgoing content during the exit animation; back returns to the source section.
+        var lastContact by remember { mutableStateOf<Contact?>(null) }
+        androidx.compose.runtime.LaunchedEffect(selectedContact) {
+            if (selectedContact != null) lastContact = selectedContact
+        }
+        AnimatedVisibility(
+            visible = selectedContact != null,
+            enter = slideInHorizontally(tween(320)) { it / 5 } + fadeIn(tween(240)),
+            exit = slideOutHorizontally(tween(280)) { it / 5 } + fadeOut(tween(220))
+        ) {
+            val contact = selectedContact ?: lastContact
+            if (contact != null) Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+                ChatScreen(
+                    cid = contact.cid, contactName = contact.name, contactOnline = contact.online,
+                    messages = messages, avatarBytes = avatarMap[contact.cid],
+                    modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                    onSendMessage = { _, _ -> }, onBack = { currentChatCid = null }
+                )
             }
         }
     }

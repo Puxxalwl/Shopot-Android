@@ -42,6 +42,31 @@ Stille means “silence” in German. Names are limited to 1–32 UTF-8 bytes, m
 the core (16 Cyrillic letters or 8 four-byte emoji). Continue stays at the bottom
 while the form scrolls. The Android application ID is now `com.stille.messenger`; this is a separate installation without automatic migration of old data.
 
+## Navigation
+
+Swipe horizontally between Profile, Chats, Contacts and Settings, or use the
+bottom tabs. Transitions slide smoothly with a subtle motion-blur approximation
+on Android 12+; older devices use slide/scale/fade without blur. Content is sharp
+at rest. Swiping sections is disabled inside conversations and invitation sheets.
+Back from a conversation returns to the section you opened it from.
+
+## Profile photo
+
+In Profile, choose **Set photo** / **Change photo**. The system picker needs no
+broad storage permission. Images up to 8 MiB are processed off-thread: EXIF
+orientation, center square crop, JPEG without metadata, and resizing/compression
+to the core limit of 16,000 bytes. Success is shown only after SET_AVATAR confirms
+the content id and size. Failures keep the previous photo.
+
+Profile, chats and contacts render memory-only images with initials as fallback.
+The cache holds at most 20 images (including your own); peer images require a
+confirmed JOIN. The core stores the uploaded photo encrypted across restarts.
+**Current API limitation:** it has no method to read your own photo bytes back,
+so your own preview is available only while the service process retains it.
+Peer previews depend on AVATAR_RECEIVED; this client does not poll or write a
+plaintext image cache. No camera capture, manual crop editor or remove-photo API
+is implemented.
+
 ## Setup
 
 ### Prerequisites
