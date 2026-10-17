@@ -3,6 +3,8 @@ package com.stille.messenger.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,12 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SettingsBrightness
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -72,11 +75,12 @@ fun WelcomeScreen(
     var name by rememberSaveable { mutableStateOf(initialName) }
     var language by rememberSaveable { mutableStateOf(initialLanguage) }
     var themeMode by rememberSaveable { mutableStateOf(initialThemeMode) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
     val isEnglish = language == "en"
     val isDark = StilleColors.isDark
     val foreground = if (isDark) Color.White else Color(0xFF182235)
-    val muted = if (isDark) Color(0xB8FFFFFF) else Color(0xFF66738B)
-    val card = if (isDark) Color(0x301B2435) else Color(0xB8FFFFFF)
+    val muted = if (isDark) Color(0xFFD0D6E4) else Color(0xFF48556C)
+    val card = if (isDark) Color(0xFF202838) else Color(0xFFF5F7FC)
     val border = if (isDark) Color(0x38FFFFFF) else Color(0xB8FFFFFF)
 
     val nameBytes = ProfileName.byteLength(name.trim())
@@ -90,7 +94,7 @@ fun WelcomeScreen(
     val continueLabel = if (isEnglish) "Continue" else "Продолжить"
 
     Box(modifier = Modifier.fillMaxSize()) {
-        WallpaperBackground()
+        Box(Modifier.fillMaxSize().background(if (isDark) Color(0xFF101522) else Color(0xFFF1F4FA)))
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -121,7 +125,7 @@ fun WelcomeScreen(
                 Image(
                     painter = painterResource(R.drawable.stille_logo),
                     contentDescription = "Stille Messenger",
-                    modifier = Modifier.size(86.dp)
+                    modifier = Modifier.size(110.dp)
                 )
                 Spacer(modifier = Modifier.height(18.dp))
                 Text(
@@ -151,13 +155,12 @@ fun WelcomeScreen(
                             onValueChange = { value -> name = ProfileName.limitInput(value) },
                             isError = nameBytes > ProfileName.MAX_BYTES,
                             supportingText = {
-                                Text(if (isEnglish) "$nameBytes / 32 UTF-8 bytes" else "$nameBytes / 32 байта UTF-8")
+                                Text("$nameBytes / 32", color = muted)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             shape = RoundedCornerShape(17.dp),
                             placeholder = { Text(nameHint, color = muted) },
-                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = WelcomeBlue) },
                             keyboardOptions = KeyboardOptions(
                                 capitalization = KeyboardCapitalization.Words,
                                 keyboardType = KeyboardType.Text
@@ -224,9 +227,25 @@ fun WelcomeScreen(
                 enabled = validName,
                 onClick = { onComplete(name.trim(), language, themeMode) }
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = { showAbout = true }) {
+                Text(if (isEnglish) "Why Stille?" else "Почему Stille?", color = foreground)
+            }
         }
     }
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            title = { Text(if (isEnglish) "Why Stille?" else "Почему Stille?") },
+            text = {
+                Text(if (isEnglish)
+                    "Stille is an open-source client for shopot-core. The client has no analytics or advertising SDKs. Connections and encryption are handled by the local core, not by a Stille server.\n\nOpen source is not a guarantee of security: device security, the core version and connection settings also matter."
+                else
+                    "Stille — открытый клиент для shopot-core. В клиенте нет аналитики и рекламных SDK. Соединениями и шифрованием занимается локальное ядро, а не сервер Stille.\n\nОткрытый код сам по себе не гарантирует безопасность: важны защита устройства, версия ядра и настройки соединения.")
+            },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text(if (isEnglish) "Got it" else "Понятно") } }
+        )
+    }
+
 }
 
 @Composable
@@ -247,40 +266,34 @@ private fun SegmentedChoice(
     muted: Color,
     selectedColor: Color
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(17.dp))
-            .background(Color.White.copy(alpha = if (StilleColors.isDark) 0.07f else 0.34f))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        // Keep the visible track compact without shrinking the touch targets.
+        Box(
+            modifier = Modifier.fillMaxWidth().height(36.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (StilleColors.isDark) Color(0xFF303B50) else Color(0xFFE0E6F0))
+        )
+        Row(modifier = Modifier.fillMaxWidth().selectableGroup()) {
         options.forEach { (value, label) ->
-            val isSelected = value == selected
+            val active = value == selected
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(if (isSelected) selectedColor else Color.Transparent)
-                    .clickable(role = Role.Tab, onClick = { onSelect(value) })
-                    .semantics { role = Role.Tab },
+                modifier = Modifier.weight(1f).height(48.dp)
+                    .selectable(selected = active, role = Role.RadioButton, onClick = { onSelect(value) }),
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isSelected) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                    }
-                    Text(
-                        text = label,
-                        color = if (isSelected) Color.White else if (foreground.alpha > 0.9f) foreground else muted,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1
-                    )
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp).height(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (active) {
+                            selectedColor
+                        } else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, color = foreground, fontSize = 13.sp,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
                 }
             }
+        }
         }
     }
 }
@@ -298,7 +311,7 @@ private fun GlassActionButton(label: String, enabled: Boolean, onClick: () -> Un
                 else Brush.horizontalGradient(listOf(Color(0x668AA4C2), Color(0x668AA4C2)))
             )
             .border(1.dp, Color.White.copy(alpha = if (enabled) 0.38f else 0.15f), shape)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.55f), fontSize = 16.sp, fontWeight = FontWeight.Bold)

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Cross-compilation tooling for shopot-core as `aarch64-linux-musl`
 
 ### Changed
+- Improved welcome contrast with controlled backgrounds, enlarged the transparent logo, removed the name-field icon and technical counter wording, and added compact single-choice controls and a bilingual “Why Stille?” explanation.
+- Used the background logo exclusively for launcher icons.
 - Rebranded the Android project as `stille` / Stille Messenger with a transparent logo and updated launcher icons; changed the application ID to `com.stille.messenger` (a separate installation without automatic data migration).
 - Anchored the welcome Continue button below the scrollable form, with keyboard insets.
 - Limited profile names to 1–32 UTF-8 bytes as required by core SET_NAME, with a byte counter and Unicode boundary tests.
