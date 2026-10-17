@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Cross-compilation tooling for shopot-core as `aarch64-linux-musl`
 
 ### Changed
+- Declared the Android 14+ `dataSync` foreground-service permission and removed the unused `connectedDevice` service type, preventing a startup `SecurityException`.
 - Added `core-src/` as a pinned git submodule for shopot-core.
 - Replaced boxed byte accumulation in the protocol encoder with a reusable
   primitive `ByteArray` buffer and geometric growth.
