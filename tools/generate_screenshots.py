@@ -10,7 +10,7 @@ from html import escape
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "screenshots"
-LOGO = "../../app/src/main/res/drawable-nodpi/shopot_logo.png"
+LOGO = "../../app/src/main/res/drawable-nodpi/stille_logo.png"
 
 W, H = 720, 1280
 
@@ -63,17 +63,21 @@ def chat() -> str:
 def settings() -> str:
     body = '''<rect x="48" y="180" width="624" height="102" rx="28" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="82" y="230" font-family="sans-serif" font-size="28" fill="#182235">Тёмная тема</text><text x="82" y="265" font-family="sans-serif" font-size="20" fill="#71809B">Светлая / тёмная</text><rect x="575" y="215" width="58" height="34" rx="17" fill="#1683FF"/><circle cx="616" cy="232" r="13" fill="white"/>
     <rect x="48" y="310" width="624" height="102" rx="28" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="82" y="360" font-family="sans-serif" font-size="28" fill="#182235">Язык</text><text x="82" y="395" font-family="sans-serif" font-size="20" fill="#71809B">Русский</text>
-    <rect x="48" y="440" width="624" height="102" rx="28" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="82" y="490" font-family="sans-serif" font-size="28" fill="#182235">Уведомления</text><text x="82" y="525" font-family="sans-serif" font-size="20" fill="#71809B">Фоновый сервис Shopot</text>'''
+    <rect x="48" y="440" width="624" height="102" rx="28" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="82" y="490" font-family="sans-serif" font-size="28" fill="#182235">Уведомления</text><text x="82" y="525" font-family="sans-serif" font-size="20" fill="#71809B">Фоновый сервис Stille</text>'''
     return svg("Настройки", body)
 
 def welcome() -> str:
-    body = '''<circle cx="360" cy="188" r="54" fill="#1683FF"/><text x="339" y="207" font-family="sans-serif" font-size="56" font-weight="700" fill="white">Ш</text>
-    <text x="58" y="300" font-family="sans-serif" font-size="34" font-weight="700" fill="#182235">Добро пожаловать в Shopot</text>
-    <text x="58" y="340" font-family="sans-serif" font-size="22" fill="#71809B">Настройте приложение под себя</text>
-    <rect x="48" y="390" width="624" height="112" rx="28" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="82" y="434" font-family="sans-serif" font-size="20" fill="#71809B">Ваше имя</text><text x="82" y="476" font-family="sans-serif" font-size="28" fill="#182235">Алексей</text>
-    <text x="58" y="570" font-family="sans-serif" font-size="24" font-weight="600" fill="#182235">Язык интерфейса</text><rect x="48" y="600" width="300" height="64" rx="24" fill="#1683FF"/><text x="105" y="641" font-family="sans-serif" font-size="24" fill="white">Русский</text><rect x="360" y="600" width="300" height="64" rx="24" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="446" y="641" font-family="sans-serif" font-size="24" fill="#182235">English</text>
-    <text x="58" y="730" font-family="sans-serif" font-size="24" font-weight="600" fill="#182235">Тема</text><rect x="48" y="760" width="188" height="64" rx="24" fill="#1683FF"/><text x="75" y="801" font-family="sans-serif" font-size="21" fill="white">Системная</text><rect x="248" y="760" width="188" height="64" rx="24" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="281" y="801" font-family="sans-serif" font-size="21" fill="#182235">Светлая</text><rect x="448" y="760" width="188" height="64" rx="24" fill="#FFFFFF55" stroke="#FFFFFF66"/><text x="485" y="801" font-family="sans-serif" font-size="21" fill="#182235">Тёмная</text>
-    <rect x="48" y="900" width="624" height="76" rx="24" fill="#1683FF"/><text x="315" y="948" font-family="sans-serif" font-size="26" font-weight="600" fill="white">Начать</text>'''
+    body = f'''<image href="{LOGO}" x="302" y="120" width="116" height="116"/>
+    <text x="58" y="286" font-family="sans-serif" font-size="34" font-weight="700" fill="#182235">Добро пожаловать в Stille</text>
+    <text x="58" y="326" font-family="sans-serif" font-size="22" fill="#71809B">Тихое место для ваших разговоров</text>
+    <rect x="48" y="370" width="624" height="590" rx="32" fill="#FFFFFF99" stroke="#FFFFFFCC"/>
+    <circle cx="90" cy="420" r="16" fill="#1683FF"/><text x="120" y="428" font-family="sans-serif" font-size="22" font-weight="600" fill="#182235">Ваше имя</text>
+    <rect x="72" y="450" width="576" height="68" rx="18" fill="#FFFFFF88" stroke="#FFFFFFAA"/><text x="110" y="493" font-family="sans-serif" font-size="24" fill="#71809B">Как к вам обращаться?</text>
+    <text x="100" y="545" font-family="sans-serif" font-size="18" fill="#71809B">0 / 32 байта UTF-8</text><circle cx="90" cy="570" r="16" fill="#1683FF"/><text x="120" y="578" font-family="sans-serif" font-size="22" font-weight="600" fill="#182235">Язык интерфейса</text>
+    <rect x="72" y="600" width="576" height="58" rx="17" fill="#FFFFFF66"/><rect x="78" y="606" width="278" height="46" rx="13" fill="#1683FF"/><text x="157" y="636" font-family="sans-serif" font-size="20" font-weight="600" fill="white">✓ Русский</text><text x="458" y="636" font-family="sans-serif" font-size="20" fill="#182235">English</text>
+    <circle cx="90" cy="710" r="16" fill="#8B6DFF"/><text x="120" y="718" font-family="sans-serif" font-size="22" font-weight="600" fill="#182235">Оформление</text>
+    <rect x="72" y="740" width="576" height="58" rx="17" fill="#FFFFFF66"/><rect x="78" y="746" width="180" height="46" rx="13" fill="#8B6DFF"/><text x="102" y="776" font-family="sans-serif" font-size="18" font-weight="600" fill="white">✓ Системная</text><text x="304" y="776" font-family="sans-serif" font-size="18" fill="#182235">Светлая</text><text x="512" y="776" font-family="sans-serif" font-size="18" fill="#182235">Тёмная</text>
+    <rect x="72" y="1130" width="576" height="68" rx="18" fill="#1683FF"/><text x="308" y="1173" font-family="sans-serif" font-size="24" font-weight="700" fill="white">Продолжить</text>'''
     return svg("Первый запуск", body, show_nav=False)
 
 
@@ -82,7 +86,7 @@ def main() -> None:
     files = {"welcome.svg": welcome(), "chats.svg": chats(), "chat.svg": chat(), "settings.svg": settings()}
     for name, content in files.items():
         (OUT / name).write_text(content, encoding="utf-8")
-    (OUT / "README.md").write_text("""# Example screenshots\n\nGenerated by `tools/generate_screenshots.py`. SVG is used to keep examples\nsmall and deterministic. The supplied Shopot logo is installed at\n`app/src/main/res/drawable-nodpi/shopot_logo.png`.\n\n![Welcome](welcome.svg)\n![Chats](chats.svg)\n![Chat](chat.svg)\n![Settings](settings.svg)\n""", encoding="utf-8")
+    (OUT / "README.md").write_text("""# Example screenshots\n\nGenerated by `tools/generate_screenshots.py`. SVG is used to keep examples\nsmall and deterministic. The supplied Stille logo is installed at\n`app/src/main/res/drawable-nodpi/stille_logo.png`.\n\n![Welcome](welcome.svg)\n![Chats](chats.svg)\n![Chat](chat.svg)\n![Settings](settings.svg)\n""", encoding="utf-8")
     print(f"generated {len(files)} screenshot examples in {OUT.relative_to(ROOT)}")
 
 

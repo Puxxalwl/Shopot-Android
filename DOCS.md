@@ -1,4 +1,4 @@
-# Documentation rules for the Shopot Android client
+# Documentation rules for the Stille-Messenger client
 
 **English** | [Русский](ru/DOCS.md)
 
@@ -29,7 +29,7 @@ apply with equal force. Breaking these rules is review-blocking.
 
 - Every byte layout, constant, limit, numeric code, and path is verified
   against `shopot-core/zig/docs/CORE-API.md` and the protocol codec
-  `data/src/commonMain/kotlin/com/shopot/coreapi/ShopotProtocol.kt`.
+  `data/src/commonMain/kotlin/com/stille/coreapi/StilleProtocol.kt`.
 - Code and docs disagree → one is wrong. Fix both in one commit or file it.
 - A doc never specifies behavior that no implementation has.
 

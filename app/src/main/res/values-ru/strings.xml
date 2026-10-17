@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- App name -->
-    <string name="app_name">Shopot Messager</string>
+    <string name="app_name">Stille Messenger</string>
 
     <!-- Bottom nav -->
     <string name="nav_profile">Профиль</string>
@@ -36,12 +36,12 @@
 
     <!-- About -->
     <string name="about">О программе</string>
-    <string name="version">Shopot Messager v0.1.0</string>
+    <string name="version">Stille Messenger v0.1.0</string>
 
     <!-- Notifications -->
-    <string name="notification_channel_name">Shopot</string>
+    <string name="notification_channel_name">Stille Messenger</string>
     <string name="notification_channel_desc">Фоновый сервис мессенджера</string>
-    <string name="notification_content">Shopot работает в фоне</string>
+    <string name="notification_content">Stille Messenger работает в фоне</string>
 
     <!-- Errors -->
     <string name="error_core_not_found">Бинарник shopot-core не найден</string>

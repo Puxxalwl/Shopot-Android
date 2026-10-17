@@ -1,4 +1,4 @@
-# Contributing to Shopot Android
+# Contributing to Stille-Messenger
 
 **English** | [Русский](ru/CONTRIBUTING.md)
 
@@ -20,8 +20,8 @@ Read this before opening a PR.
 ## 2. Development setup
 
 ```bash
-git clone https://github.com/Shopot/Shopot-Android.git
-cd Shopot-Android
+git clone https://github.com/Puxxalwl/Stille-Messenger-Android.git
+cd Stille-Messenger-Android
 # Android Studio: open project, sync Gradle
 # Or CLI (requires JDK 17 + Android SDK):
 ./gradlew :app:assembleDebug
@@ -34,12 +34,12 @@ cd Shopot-Android
 
 | Subsystem | Directory |
 |---|---|
-| Protocol codec | `data/src/commonMain/kotlin/com/shopot/coreapi/` |
-| Service + UDS | `app/src/main/java/com/shopot/messenger/service/` |
-| UI components | `app/src/main/java/com/shopot/messenger/ui/components/` |
-| UI screens | `app/src/main/java/com/shopot/messenger/ui/screens/` |
-| Theme | `app/src/main/java/com/shopot/messenger/ui/theme/` |
-| DI | `app/src/main/java/com/shopot/messenger/di/` |
+| Protocol codec | `data/src/commonMain/kotlin/com/stille/coreapi/` |
+| Service + UDS | `app/src/main/java/com/stille/messenger/service/` |
+| UI components | `app/src/main/java/com/stille/messenger/ui/components/` |
+| UI screens | `app/src/main/java/com/stille/messenger/ui/screens/` |
+| Theme | `app/src/main/java/com/stille/messenger/ui/theme/` |
+| DI | `app/src/main/java/com/stille/messenger/di/` |
 | Resources | `app/src/main/res/` |
 | Docs | root `*.md`, `ru/*.md` |
 

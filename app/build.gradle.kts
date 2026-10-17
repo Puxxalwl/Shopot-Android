@@ -7,17 +7,17 @@ plugins {
 }
 
 android {
-    namespace = "com.shopot.messenger"
+    namespace = "com.stille.messenger"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.shopot.messenger"
+        applicationId = "com.stille.messenger"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
 
-        testInstrumentationRunner = "com.shopot.messenger.HiltTestRunner"
+        testInstrumentationRunner = "com.stille.messenger.HiltTestRunner"
 
         ndk {
             abiFilters += listOf("arm64-v8a")

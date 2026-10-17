@@ -1,4 +1,4 @@
-# AGENTS.md — Shopot Android client
+# AGENTS.md — Stille-Messenger client
 
 **English** | [Русский](ru/AGENTS.md)
 
@@ -19,7 +19,7 @@ shopot-core. The client's job is rendering and transport glue.
 3. **No plaintext on disk.** Avatars and files are stored encrypted by the
    core. Client-side caches are memory-only or encrypted at rest.
 4. **Binary protocol only.** The UDS interface is the binary framed protocol
-   defined in [`data/src/main/java/com/shopot/coreapi/ShopotProtocol.kt`](data/src/main/java/com/shopot/coreapi/ShopotProtocol.kt).
+   defined in [`data/src/main/java/com/stille/coreapi/StilleProtocol.kt`](data/src/main/java/com/stille/coreapi/StilleProtocol.kt).
    Never add JSON serialization for the protocol layer; keep the frame format
    from `shopot-core/zig/docs/CORE-API.md` §2 verbatim.
 5. **Authentication before trust.** Do not render contact identity, name,
@@ -41,7 +41,7 @@ shopot-core. The client's job is rendering and transport glue.
   `CHANGELOG.md` inside the core repo; check before implementing a new method
   or event.
 - Source code (this repo) is authoritative for behavior. The
-  `ShopotProtocol.kt` binary codec must match `CORE-API.md` byte-for-byte.
+  `StilleProtocol.kt` binary codec must match `CORE-API.md` byte-for-byte.
 - English documentation is normative. Russian mirrors update in the same
   commit — EN + RU must not diverge.
 
@@ -57,12 +57,12 @@ shopot-core. The client's job is rendering and transport glue.
 
 | Subsystem | Files |
 |---|---|
-| Protocol codec | `data/src/main/java/com/shopot/coreapi/` |
-| Foreground service | `services/src/main/kotlin/com/shopot/messenger/service/` |
-| UI components | `app/src/main/java/com/shopot/messenger/ui/components/` |
-| UI screens | `app/src/main/java/com/shopot/messenger/ui/screens/` |
-| Theme | `app/src/main/java/com/shopot/messenger/ui/theme/` |
-| DI | `app/src/main/java/com/shopot/messenger/di/` |
+| Protocol codec | `data/src/main/java/com/stille/coreapi/` |
+| Foreground service | `services/src/main/kotlin/com/stille/messenger/service/` |
+| UI components | `app/src/main/java/com/stille/messenger/ui/components/` |
+| UI screens | `app/src/main/java/com/stille/messenger/ui/screens/` |
+| Theme | `app/src/main/java/com/stille/messenger/ui/theme/` |
+| DI | `app/src/main/java/com/stille/messenger/di/` |
 | Native binary | `app/src/main/jniLibs/arm64-v8a/shopot` (generated) |
 
 ## 5. Kotlin coding rules
@@ -92,7 +92,7 @@ shopot-core. The client's job is rendering and transport glue.
 
 ## 8. Testing and validation
 - `DEBUG_CORE` build flag: connect to a mock UDS server for UI tests.
-- Unit tests for the protocol codec (`ShopotProtocolTest`).
+- Unit tests for the protocol codec (`StilleProtocolTest`).
 - Instrumentation tests for main screens (chats list → message list).
 
 ## 9. Git, commits, and pull requests

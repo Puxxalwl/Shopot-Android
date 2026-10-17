@@ -1,4 +1,4 @@
-# Shopot Android — ProGuard rules
+# Stille-Messenger — ProGuard rules
 
 # Compose
 -keep class androidx.compose.runtime.** { *; }
@@ -10,21 +10,21 @@
 -keep class kotlinx.coroutines.** { *; }
 
 # Keep Hilt/Dagger
--keep class com.shopot.messenger.di.** { *; }
+-keep class com.stille.messenger.di.** { *; }
 -keep class * extends androidx.hilt.lifecycle.ViewModelAssistedFactory
 -keep class * extends androidx.lifecycle.AbstractSavedStateViewModel
 
 # Keep native library
--keep class com.shopot.coreapi.** { *; }
+-keep class com.stille.coreapi.** { *; }
 
 # Enums
--keepclassmembers enum com.shopot.coreapi.** {
+-keepclassmembers enum com.stille.coreapi.** {
     public static **[] values();
     public static *** valueOf(java.lang.String);
 }
 
 # Don't obfuscate the binary protocol
--assumenosideeffects class com.shopot.coreapi.ShopotProtocol {
+-assumenosideeffects class com.stille.coreapi.StilleProtocol {
     public static byte[] encodeFrame(...);
     public static kotlin.Pair decodeFrame(byte[]);
 }

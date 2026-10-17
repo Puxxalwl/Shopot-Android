@@ -1,4 +1,4 @@
-# Shopot Messager (Android)
+# Stille Messenger (Android)
 
 **English** | [Русский](ru/README.md)
 
@@ -28,14 +28,19 @@ Generated examples are in [docs/screenshots](docs/screenshots):
 ![Settings](docs/screenshots/settings.svg)
 
 Regenerate them with `python3 tools/generate_screenshots.py`. The supplied
-Shopot logo is stored at `app/src/main/res/drawable-nodpi/shopot_logo.png`.
+Stille logo is stored at `app/src/main/res/drawable-nodpi/stille_logo.png`.
 
 ## First launch
 
-On the first launch, Shopot opens a local welcome setup where you choose the
+On the first launch, Stille Messenger opens a local welcome setup where you choose the
 interface language, light/system/dark theme, and the name shown on your profile.
 These choices are stored locally on the device and can be changed later in the
 app settings/profile.
+
+
+Stille means “silence” in German. Names are limited to 1–32 UTF-8 bytes, matching
+the core (16 Cyrillic letters or 8 four-byte emoji). Continue stays at the bottom
+while the form scrolls. The Android application ID is now `com.stille.messenger`; this is a separate installation without automatic migration of old data.
 
 ## Setup
 
@@ -62,14 +67,14 @@ app settings/profile.
 ```
 app/                      # Android app: Compose UI + foreground service
 ├── ui/                   # Compose screens, components, theme
-├── service/              # ShopotService (foreground) + BootReceiver
+├── service/              # StilleService (foreground) + BootReceiver
 data/                     # Protocol codec (matches CORE-API.md byte-for-byte)
 tools/                    # Cross-compile scripts for shopot-core
 core-src/                 # shopot-core source (git submodule / cloned)
 ```
 
 The `data` module implements the binary UDS protocol codec. The
-`ShopotService` foreground service:
+`StilleService` foreground service:
 1. Extracts and starts the `shopot` binary from assets
 2. Connects to `~/.shopot/api.sock` (UDS)
 3. Sends `GET_VERSION` to verify core compatibility

@@ -1,4 +1,4 @@
-# Contributing to Shopot Android (RU)
+# Contributing to Stille-Messenger (RU)
 
 **English** | [Русский](ru/CONTRIBUTING.md)
 
@@ -12,8 +12,8 @@
 
 ## 2. Настройка
 ```bash
-git clone https://github.com/Shopot/Shopot-Android.git
-cd Shopot-Android
+git clone https://github.com/Puxxalwl/Stille-Messenger-Android.git
+cd Stille-Messenger-Android
 ./gradlew :app:assembleDebug
 ```
 
@@ -22,9 +22,9 @@ cd Shopot-Android
 ## 3. Архитектура исходников
 | Подсистема | Папка |
 |---|---|
-| Протокол | `data/src/main/java/com/shopot/coreapi/` |
-| Сервис | `app/src/main/java/com/shopot/messenger/service/` |
-| UI | `app/src/main/java/com/shopot/messenger/ui/` |
+| Протокол | `data/src/main/java/com/stille/coreapi/` |
+| Сервис | `app/src/main/java/com/stille/messenger/service/` |
+| UI | `app/src/main/java/com/stille/messenger/ui/` |
 
 ## 4. Коммиты
 Формат: `component: imperative summary` (≤ 72 символов).

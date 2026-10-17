@@ -1,4 +1,4 @@
-# AGENTS.md — Shopot Android client
+# AGENTS.md — Stille-Messenger client
 
 **English** | [Русский](ru/AGENTS.md)
 

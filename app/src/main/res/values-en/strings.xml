@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">Shopot Messager</string>
+    <string name="app_name">Stille Messenger</string>
 
     <string name="nav_profile">Profile</string>
     <string name="nav_chats">Chats</string>
@@ -29,11 +29,11 @@
     <string name="menu_block">Block</string>
 
     <string name="about">About</string>
-    <string name="version">Shopot Messager v0.1.0</string>
+    <string name="version">Stille Messenger v0.1.0</string>
 
-    <string name="notification_channel_name">Shopot</string>
+    <string name="notification_channel_name">Stille Messenger</string>
     <string name="notification_channel_desc">Background messenger service</string>
-    <string name="notification_content">Shopot is running in background</string>
+    <string name="notification_content">Stille Messenger is running in background</string>
 
     <string name="error_core_not_found">shopot-core binary not found</string>
     <string name="error_core_failed">Failed to start shopot-core</string>

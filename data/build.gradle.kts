@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.shopot.coreapi"
+    namespace = "com.stille.coreapi"
     compileSdk = 35
 
     defaultConfig {

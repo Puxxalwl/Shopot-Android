@@ -1,4 +1,4 @@
-// Root build file for Shopot Android client
+// Root build file for Stille-Messenger client
 // Uses the Android client's AGPL-3.0-or-later license and no-third-party-services invariant.
 @Suppress("GradleDependency")
 plugins {

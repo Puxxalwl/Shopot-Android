@@ -1,4 +1,4 @@
-# Changelog — Shopot Android
+# Changelog — Stille-Messenger
 
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Cross-compilation tooling for shopot-core as `aarch64-linux-musl`
 
 ### Changed
+- Rebranded the Android project as `stille` / Stille Messenger with a transparent logo and updated launcher icons; changed the application ID to `com.stille.messenger` (a separate installation without automatic data migration).
+- Anchored the welcome Continue button below the scrollable form, with keyboard insets.
+- Limited profile names to 1–32 UTF-8 bytes as required by core SET_NAME, with a byte counter and Unicode boundary tests.
 - Fixed release publishing by using a dedicated `RELEASE_TOKEN` secret with repository Contents write permission when the default GitHub Actions token is restricted.
 - Declared the Android 14+ `dataSync` foreground-service permission and removed the unused `connectedDevice` service type, preventing a startup `SecurityException`.
 - Added `core-src/` as a pinned git submodule for shopot-core.
@@ -26,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   path to avoid concurrent stream reads.
 - Raw avatar payloads no longer pass through UTF-8 `String` conversion.
 - Added generated CORE-API objects and deterministic SVG screenshot examples.
-- Added the supplied Shopot logo to Android resources.
+- Added the supplied Stille logo to Android resources.
 - Documented the Linux reference client `EryyynIT/shopot`.
 
 ### Security

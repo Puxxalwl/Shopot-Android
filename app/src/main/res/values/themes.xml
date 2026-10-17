@@ -1,10 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme: Shopot (glassmorphism). -->
-    <style name="Theme.Shopot" parent="android:style/Theme.Material.Light.NoActionBar">
+    <!-- Base application theme: Stille (glassmorphism). -->
+    <style name="Theme.Stille" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@drawable/bg_gradient</item>
     </style>
 
-    <style name="Theme.Shopot.NoActionBar" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Stille.NoActionBar" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@drawable/bg_gradient</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

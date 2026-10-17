@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.shopot.messenger">
+    package="com.stille.messenger">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -13,18 +13,18 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:name=".ShopotMessagerApp"
+        android:name=".StilleMessengerApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:theme="@style/Theme.Shopot"
+        android:theme="@style/Theme.Stille"
         android:supportsRtl="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.Shopot.NoActionBar">
+            android:theme="@style/Theme.Stille.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -32,7 +32,7 @@
         </activity>
 
         <service
-            android:name=".service.ShopotService"
+            android:name=".service.StilleService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 

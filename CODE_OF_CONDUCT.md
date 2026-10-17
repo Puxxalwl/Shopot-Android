@@ -15,5 +15,5 @@ Report abuse to security@shopot.io or open a private GitHub security report.
 
 ---
 
-This is the Shopot Android client. For project-specific rules, see
+This is the Stille-Messenger client. For project-specific rules, see
 [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).

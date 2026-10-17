@@ -1,4 +1,4 @@
-# Shopot Messager (Android)
+# Stille Messenger (Android)
 
 **English** | [Русский](ru/README.md)
 
@@ -17,9 +17,14 @@ Android-клиент для демона [shopot-core](https://github.com/Puxxal
 
 ## Первый запуск
 
-При первом запуске Shopot показывает локальное окно настройки: язык
+При первом запуске Stille Messenger показывает локальное окно настройки: язык
 интерфейса, системная/светлая/тёмная тема и имя, отображаемое в профиле.
 Выборы хранятся на устройстве и доступны для изменения позже в приложении.
+
+
+Stille — «тишина» по-немецки. Имя ограничено 1–32 байтами UTF-8, как в ядре
+(16 русских букв или 8 четырёхбайтовых emoji). Кнопка «Продолжить» находится
+внизу, форма прокручивается. Android application ID изменён на `com.stille.messenger`: отдельная установка без автоматического переноса старых данных.
 
 ## Сборка
 
@@ -40,7 +45,7 @@ Android-клиент для демона [shopot-core](https://github.com/Puxxal
 
 Примеры UI, включая окно первого запуска, генерируются скриптом
 `tools/generate_screenshots.py` и находятся в [docs/screenshots](../docs/screenshots).
-Логотип установлен в `app/src/main/res/drawable-nodpi/shopot_logo.png`.
+Логотип установлен в `app/src/main/res/drawable-nodpi/stille_logo.png`.
 
 ## Linux-клиент
 
@@ -57,7 +62,7 @@ core-src/                 # Исходники shopot-core (cloned)
 tools/                    # Скрипты кросс-компиляции
 ```
 
-`ShopotService` — foreground service, который:
+`StilleService` — foreground service, который:
 1. Распаковывает и запускает бинарник `shopot` из assets
 2. Подключается к UDS `$HOME/.shopot/api.sock`
 3. Отправляет `GET_VERSION` для проверки совместимости
