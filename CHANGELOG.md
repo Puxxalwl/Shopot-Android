@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- First-run welcome setup with language, theme, and display-name selection
 - Initial project skeleton: Gradle multi-module structure, AGENTS.md
 - Binary protocol codec for CORE-API 2.2.0 (`data` KMP module): Frame header
   parsing, all 32 request methods, 12 event types, 14 status codes

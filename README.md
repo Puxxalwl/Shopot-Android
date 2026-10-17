@@ -22,12 +22,20 @@ Serverless P2P messenger Android client for the [shopot-core](https://github.com
 
 Generated examples are in [docs/screenshots](docs/screenshots):
 
+![Welcome](docs/screenshots/welcome.svg)
 ![Chats](docs/screenshots/chats.svg)
 ![Chat](docs/screenshots/chat.svg)
 ![Settings](docs/screenshots/settings.svg)
 
 Regenerate them with `python3 tools/generate_screenshots.py`. The supplied
 Shopot logo is stored at `app/src/main/res/drawable-nodpi/shopot_logo.png`.
+
+## First launch
+
+On the first launch, Shopot opens a local welcome setup where you choose the
+interface language, light/system/dark theme, and the name shown on your profile.
+These choices are stored locally on the device and can be changed later in the
+app settings/profile.
 
 ## Setup
 

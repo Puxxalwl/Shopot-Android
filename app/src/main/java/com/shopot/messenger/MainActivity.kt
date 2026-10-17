@@ -4,12 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -18,14 +23,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.Icon
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.shopot.coreapi.Contact
 import com.shopot.coreapi.Message
+import com.shopot.messenger.service.ShopotService
+import com.shopot.messenger.ui.SetupPreferences
 import com.shopot.messenger.ui.components.BottomNavItem
 import com.shopot.messenger.ui.components.GlassSurface
 import com.shopot.messenger.ui.screens.ChatScreen
@@ -34,30 +41,79 @@ import com.shopot.messenger.ui.screens.ContactsScreen
 import com.shopot.messenger.ui.screens.ProfileScreen
 import com.shopot.messenger.ui.screens.SettingsScreen
 import com.shopot.messenger.ui.screens.WallpaperBackground
+import com.shopot.messenger.ui.screens.WelcomeScreen
 import com.shopot.messenger.ui.theme.ShopotTheme
-import com.shopot.messenger.service.ShopotService
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ShopotService.start(this)
+        val setupPreferences = SetupPreferences(this)
+        if (setupPreferences.completed) {
+            ShopotService.start(this)
+        }
         setContent {
-            ShopotTheme {
-                ShopotApp()
+            val preferences = remember { setupPreferences }
+            var setupCompleted by rememberSaveable { mutableStateOf(preferences.completed) }
+            var name by rememberSaveable { mutableStateOf(preferences.name) }
+            var language by rememberSaveable { mutableStateOf(preferences.language) }
+            var themeMode by rememberSaveable { mutableStateOf(preferences.themeMode) }
+
+            ShopotTheme(themeMode = themeMode, language = language) {
+                if (!setupCompleted) {
+                    WelcomeScreen(
+                        initialName = name,
+                        initialLanguage = language,
+                        initialThemeMode = themeMode,
+                        onLanguagePreview = { language = it },
+                        onThemePreview = { themeMode = it },
+                        onComplete = { selectedName, selectedLanguage, selectedTheme ->
+                            preferences.save(selectedName, selectedLanguage, selectedTheme)
+                            name = selectedName
+                            language = selectedLanguage
+                            themeMode = selectedTheme
+                            setupCompleted = true
+                            ShopotService.start(this@MainActivity)
+                        }
+                    )
+                } else {
+                    ShopotApp(
+                        name = name,
+                        language = language,
+                        themeMode = themeMode,
+                        onNameChange = {
+                            name = it
+                            preferences.updateName(it)
+                        },
+                        onLanguageChange = {
+                            language = it
+                            preferences.updateLanguage(it)
+                        },
+                        onThemeModeChange = {
+                            themeMode = it
+                            preferences.updateThemeMode(it)
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun ShopotApp() {
+fun ShopotApp(
+    name: String,
+    language: String,
+    themeMode: String,
+    onNameChange: (String) -> Unit,
+    onLanguageChange: (String) -> Unit,
+    onThemeModeChange: (String) -> Unit
+) {
     var currentRoute by rememberSaveable { mutableStateOf("chats") }
     var contacts by rememberSaveable { mutableStateOf(emptyList<Contact>()) }
     var currentChatCid by rememberSaveable { mutableStateOf<Int?>(null) }
     var messages by rememberSaveable { mutableStateOf(emptyList<Message>()) }
-    var darkTheme by rememberSaveable { mutableStateOf(false) }
-    var language by rememberSaveable { mutableStateOf("ru") }
     var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
+    val darkTheme = com.shopot.messenger.ui.theme.ShopotColors.isDark
 
     val bottomNavItems = listOf(
         BottomNavItem("Профиль", Icons.Default.Person, "profile"),
@@ -68,16 +124,10 @@ fun ShopotApp() {
 
     Box(modifier = Modifier.fillMaxSize()) {
         WallpaperBackground()
-
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                GlassSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp),
-                    cornerRadius = 0.dp
-                ) {
+                GlassSurface(modifier = Modifier.fillMaxWidth().height(64.dp), cornerRadius = 0.dp) {
                     NavigationBar(containerColor = Color.Transparent) {
                         bottomNavItems.forEach { item ->
                             NavigationBarItem(
@@ -99,9 +149,7 @@ fun ShopotApp() {
                                     currentRoute = item.route
                                     currentChatCid = null
                                 },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = Color(0x10FFFFFF)
-                                )
+                                colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0x10FFFFFF))
                             )
                         }
                     }
@@ -109,7 +157,7 @@ fun ShopotApp() {
             }
         ) { padding ->
             Box(modifier = Modifier.padding(padding)) {
-                Crossfade(targetState = currentRoute) { route ->
+                Crossfade(targetState = currentRoute, label = "main-route") { route ->
                     when (route) {
                         "chats" -> {
                             if (currentChatCid != null) {
@@ -135,17 +183,17 @@ fun ShopotApp() {
                         }
                         "contacts" -> ContactsScreen(contacts = contacts)
                         "profile" -> ProfileScreen(
-                            name = "User",
+                            name = name,
                             avatarBytes = null,
-                            onSetName = { },
+                            onSetName = onNameChange,
                             onSetAvatar = { }
                         )
                         "settings" -> SettingsScreen(
                             darkTheme = darkTheme,
                             language = language,
                             notificationsEnabled = notificationsEnabled,
-                            onToggleDarkTheme = { darkTheme = it },
-                            onToggleLanguage = { language = if (language == "ru") "en" else "ru" },
+                            onToggleDarkTheme = { onThemeModeChange(if (it) "dark" else "light") },
+                            onToggleLanguage = { onLanguageChange(if (language == "ru") "en" else "ru") },
                             onToggleNotifications = { notificationsEnabled = it }
                         )
                     }

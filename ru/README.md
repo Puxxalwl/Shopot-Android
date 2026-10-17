@@ -15,6 +15,12 @@ Android-клиент для демона [shopot-core](https://github.com/Puxxal
 - **Голосовые звонки** — 16 кГц E2EE, ADPCM + DTX
 - **Офлайн-доставка** — зашифрованный outbox с ACK и dedup
 
+## Первый запуск
+
+При первом запуске Shopot показывает локальное окно настройки: язык
+интерфейса, системная/светлая/тёмная тема и имя, отображаемое в профиле.
+Выборы хранятся на устройстве и доступны для изменения позже в приложении.
+
 ## Сборка
 
 ```bash
@@ -32,9 +38,9 @@ Android-клиент для демона [shopot-core](https://github.com/Puxxal
 
 ## Скриншоты
 
-Примеры UI генерируются скриптом `tools/generate_screenshots.py` и находятся
-в [docs/screenshots](../docs/screenshots). Логотип установлен в
-`app/src/main/res/drawable-nodpi/shopot_logo.png`.
+Примеры UI, включая окно первого запуска, генерируются скриптом
+`tools/generate_screenshots.py` и находятся в [docs/screenshots](../docs/screenshots).
+Логотип установлен в `app/src/main/res/drawable-nodpi/shopot_logo.png`.
 
 ## Linux-клиент
 
