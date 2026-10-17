@@ -25,6 +25,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -74,16 +75,62 @@ jobs:
           chmod +x tools/build-core.sh
           ./tools/build-core.sh
 
+      - name: Restore persistent release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD CERT_SHA256; do
+            test -n "${!name}" || { echo "Missing persistent signing configuration: $name" >&2; exit 1; }
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/stille-release.keystore"
+
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+        env:
+          STILLE_KEYSTORE_PATH: ${{ runner.temp }}/stille-release.keystore
+          STILLE_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          STILLE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STILLE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease --no-daemon --no-configuration-cache
+
+      - name: Verify release signature and pinned certificate
+        env:
+          EXPECTED_CERT: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          if [ ! -x "$tools/apksigner" ]; then
+            tools="$ANDROID_HOME/build-tools/34.0.0"
+          fi
+          "$tools/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/stille-signature.txt"
+          python3 - <<'PY'
+          import os, pathlib, re, zipfile
+          output = (pathlib.Path(os.environ['RUNNER_TEMP']) / 'stille-signature.txt').read_text()
+          actual = re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)', output)
+          expected = os.environ['EXPECTED_CERT'].replace(':', '').strip().lower()
+          assert re.fullmatch(r'[0-9a-f]{64}', expected), 'Invalid pinned certificate fingerprint'
+          assert len(actual) == 1 and actual[0].lower() == expected, 'Release signing certificate mismatch'
+          with zipfile.ZipFile('app/build/outputs/apk/release/app-release.apk') as apk:
+              assert apk.testzip() is None, 'APK archive integrity failed'
+              assert 'lib/arm64-v8a/libshopot.so' in apk.namelist(), 'Missing core executable'
+          print('APK archive, native core and pinned signing certificate verified')
+          PY
+          "$tools/zipalign" -c -v 4 "$apk"
 
       - name: Rename APK
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          apk="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
-          test -n "$apk" || { echo "Release APK not found" >&2; exit 1; }
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -f "$apk" || { echo "Verified release APK not found" >&2; exit 1; }
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release tag" >&2; exit 1; }
           echo "Packaging: $apk"
           cp "$apk" "Stille-Messenger-${RELEASE_TAG}.apk"
           ls -lh "Stille-Messenger-${RELEASE_TAG}.apk"

@@ -82,7 +82,8 @@ released when the scanner closes or the app pauses. Invite acceptance tracks the
 core-returned contact id as pending until authenticated presence/JOIN confirms
 it, so two devices using one code do not make the UI trust a provisional name.
 Theme colors now crossfade semantically; tab and conversation transitions are
-short and avoid whole-page GPU blur to reduce frame stalls. After `ACCEPT_INVITE`, the
+short (200 ms for tabs), with the cached GPU motion blur restored from v0.2.2
+on Android 12+; older devices retain slide/scale/fade. After `ACCEPT_INVITE`, the
 UI waits for the authenticated `CONTACT_JOINED` event; simultaneous acceptance
 of one one-time code is serialized by the core and only the first valid JOIN
 can create the connection. Both devices must be on the same LAN for an
@@ -110,6 +111,39 @@ bash ./tools/build-core.sh
 # Fast incremental Kotlin check (keeps Gradle/Kotlin daemons warm)
 ./gradlew :app:compileDebugKotlin --daemon --offline --max-workers=2
 ```
+
+### Release signing and installation
+
+Release builds (current version `0.2.5`, versionCode `25`) require a persistent private keystore via `STILLE_KEYSTORE_PATH`,
+`STILLE_STORE_PASSWORD`, `STILLE_KEY_ALIAS`, and `STILLE_KEY_PASSWORD`. Debug
+builds remain independent. Never commit a keystore or paste its contents into logs.
+
+GitHub Actions requires secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, plus repository variable
+`ANDROID_SIGNING_CERT_SHA256` (public certificate SHA-256, 64 hex characters).
+The workflow verifies the APK signature, pinned certificate, ZIP integrity and
+alignment before publication. Missing configuration stops a release; it never
+falls back to a newly generated debug key.
+
+Published v0.2.3 and v0.2.4 used different ephemeral runner keys: both APKs verify,
+but Android cannot install one over the other. Updating an existing installation
+requires its original private signing key; the APK contains only the public
+certificate. Do not uninstall or clear app data to troubleshoot: identity and
+history may be lost. A new permanent key fixes future continuity, not old installs.
+
+For the protected local key layout (`~/.local/share/stille-signing/release.p12`
+and `release.password`, alias `stille-release`), run:
+
+```bash
+python3 tools/build-signed-release.py --offline
+```
+
+Keep the directory private (700), files private (600), and a secure backup of
+both outside this repository. The helper never regenerates a missing key and
+turns off Gradle configuration caching for signing. Local builds use one worker,
+a 1536 MiB Gradle heap and in-process Kotlin compilation to avoid two oversized JVMs.
+Git SSH access alone cannot
+configure GitHub Actions secrets; that requires repository Secrets write access.
 
 ### Architecture
 

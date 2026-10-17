@@ -5,11 +5,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Set the next APK version to `0.2.5`/versionCode `25` instead of the stale `0.1.0`/`1` metadata. This does not bypass Android's signer compatibility requirement.
+- Release APKs no longer fall back to ephemeral debug signing keys. Require a persistent keystore and verify the pinned signer fingerprint, ZIP integrity and alignment before publishing. Confirmed v0.2.3/v0.2.4 are individually valid but have different signing certificates; updating old installations still requires their original private key.
+- Restore cached directional GPU blur from v0.2.2 on Android 12+, retaining the faster 200ms tab transitions and reduced-motion fallback.
+
 ### Added
+- Protected local release-build helper reuses the permanent keystore outside Git, refuses missing keys or unsafe permissions, and disables signing configuration caching. Four stdlib tests cover these safeguards.
 - Added a short animated motion-blur transition to the Welcome screen when setup is completed; other windows remain unchanged.
 - Added live camera QR scanning for invitations with runtime permission handling, bounded in-memory decoding and immediate camera release after a valid code. Image import remains available as a fallback.
 - ACCEPT_INVITE now tracks the returned cid as pending until authenticated presence/JOIN, refreshes the bounded contact snapshot when the peer becomes online, and keeps simultaneous one-time invite races deterministic without trusting unauthenticated names.
-- Reduced tab, segmented-control and conversation transitions to 180–200ms, removed whole-page GPU blur and welcome-submit delay, and changed theme switching to animated semantic colors instead of an opaque full-screen light/dark flash.
+- Reduced tab, segmented-control and conversation transitions to 180–200ms, restored cached directional GPU blur on Android 12+ with a reduced-motion fallback, removed the welcome-submit delay, and changed theme switching to animated semantic colors instead of an opaque full-screen light/dark flash.
 - Added a short, cheap theme crossfade that keeps the previous background over the new theme instead of repainting the whole screen with a dark/light overlay; removed the expensive welcome-screen blur to reduce transition jank.
 - Added Wi-Fi multicast permission/lock handling so address-less invitations can discover peers more reliably on Android LANs.
 - Added a theme-switch transition that expands a softly blurred square-like bubble into the new light or dark background, plus a lazy sliding square indicator for segmented choices.

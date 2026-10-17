@@ -6,6 +6,13 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+val releaseStore = providers.environmentVariable("STILLE_KEYSTORE_PATH")
+val releaseStorePassword = providers.environmentVariable("STILLE_STORE_PASSWORD")
+val releaseAlias = providers.environmentVariable("STILLE_KEY_ALIAS")
+val releaseKeyPassword = providers.environmentVariable("STILLE_KEY_PASSWORD")
+val releaseSigningReady = listOf(releaseStore, releaseStorePassword, releaseAlias, releaseKeyPassword)
+    .all { it.orNull?.isNotBlank() == true }
+
 android {
     namespace = "com.stille.messenger"
     compileSdk = 35
@@ -14,8 +21,9 @@ android {
         applicationId = "com.stille.messenger"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // Increase for published releases to support ordered updates and avoid downgrades.
+        versionCode = 25
+        versionName = "0.2.5"
 
         testInstrumentationRunner = "com.stille.messenger.HiltTestRunner"
 
@@ -60,6 +68,17 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("stableRelease") {
+                storeFile = file(releaseStore.get())
+                storePassword = releaseStorePassword.get()
+                keyAlias = releaseAlias.get()
+                keyPassword = releaseKeyPassword.get()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("boolean", "DEBUG_LOG", "true")
@@ -74,9 +93,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Until a dedicated release keystore is provided via environment
-            // variables, sign with the debug key so the APK is installable.
-            signingConfig = signingConfigs.getByName("debug")
+            // Never silently sign releases with a runner-generated debug key.
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("stableRelease")
         }
     }
 
@@ -85,6 +103,17 @@ android {
         checkReleaseBuilds = false
     }
 }
+
+val verifyReleaseSigning by tasks.registering {
+    val configured = releaseSigningReady
+    doLast {
+        check(configured) {
+            "Release signing is required: configure STILLE_KEYSTORE_PATH, STILLE_STORE_PASSWORD, " +
+                "STILLE_KEY_ALIAS and STILLE_KEY_PASSWORD. Reuse the existing signing key."
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseSigning) }
 
 // Keep compile-only checks lightweight, but never produce an APK without its core.
 val verifyCoreBinary by tasks.registering {
