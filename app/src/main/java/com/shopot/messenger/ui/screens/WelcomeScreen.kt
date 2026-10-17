@@ -28,7 +28,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -98,7 +98,7 @@ fun WelcomeScreen(
                     Text(nameQuestion, color = foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(
                         value = name.value,
-                        onValueChange = { name.value = it.take(40) },
+                        onValueChange = { value -> name.value = value.take(40) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = BlueAccent) },
