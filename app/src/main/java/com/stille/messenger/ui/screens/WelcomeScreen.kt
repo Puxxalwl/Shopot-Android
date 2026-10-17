@@ -2,6 +2,9 @@ package com.stille.messenger.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.blur
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,6 +13,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -34,8 +40,15 @@ fun WelcomeScreen(
     var language by rememberSaveable { mutableStateOf(initialLanguage) }
     var theme by rememberSaveable { mutableStateOf(initialThemeMode) }
     var about by rememberSaveable { mutableStateOf(false) }
+    var transitioning by remember { mutableStateOf(false) }
     val english = language == "en"
-    Box(Modifier.fillMaxSize()) {
+    val motionBlur by animateDpAsState(
+        targetValue = if (transitioning) 14.dp else 0.dp,
+        animationSpec = tween(durationMillis = 180),
+        label = "welcomeMotionBlur"
+    )
+    val scope = rememberCoroutineScope()
+    Box(Modifier.fillMaxSize().blur(motionBlur)) {
     WallpaperBackground()
     Column(
         Modifier.fillMaxSize()
@@ -89,8 +102,15 @@ fun WelcomeScreen(
         }
         Column(Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Button(
-                onClick = { onComplete(name.trim(), language, theme) },
-                enabled = ProfileName.isValid(name),
+                onClick = {
+                    if (transitioning) return@Button
+                    transitioning = true
+                    scope.launch {
+                        delay(180)
+                        onComplete(name.trim(), language, theme)
+                    }
+                },
+                enabled = ProfileName.isValid(name) && !transitioning,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                 shape = RoundedCornerShape(16.dp)
             ) { Text(if (english) "Continue" else "Продолжить", style = MaterialTheme.typography.labelLarge) }

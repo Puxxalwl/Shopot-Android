@@ -36,7 +36,7 @@ import com.stille.messenger.ui.theme.StilleColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> Unit, onClose: () -> Unit) {
+fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> Unit, onRetryCore: () -> Unit = {}, onClose: () -> Unit) {
     val english = StilleColors.language == "en"
     val context = LocalContext.current
     var mode by remember { mutableStateOf("share") }
@@ -73,6 +73,9 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
             Spacer(Modifier.height(20.dp))
             if (!state.ready) {
                 Text(if (english) "Local core is unavailable. Invitations need a running shopot core." else "Локальное ядро недоступно. Для приглашений нужен запущенный shopot.", color = MaterialTheme.colorScheme.error)
+                OutlinedButton(onClick = onRetryCore, enabled = !state.busy) {
+                    Text(if (english) "Retry core" else "Повторить запуск ядра")
+                }
                 Spacer(Modifier.height(12.dp))
             }
             if (mode == "share") {

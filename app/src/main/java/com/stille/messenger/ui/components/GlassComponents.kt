@@ -5,8 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -219,16 +223,32 @@ fun TopAppBarWithSearch(title: String, searchHint: String = "", onSearchChange: 
 
 @Composable
 fun SegmentedChoice(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).selectableGroup().padding(3.dp)) {
-        options.forEach { (value, label) ->
-            val active = value == selected
-            Box(
-                Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if (active) MaterialTheme.colorScheme.surface else Color.Transparent)
-                    .selectable(active, role = Role.RadioButton, onClick = { if (!active) onSelect(value) })
-                    .heightIn(min = 48.dp).padding(horizontal = 4.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    val selectedIndex = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+    val animatedIndex by animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = tween(360, easing = FastOutSlowInEasing),
+        label = "segmented-indicator"
+    )
+    BoxWithConstraints(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            .selectableGroup().padding(3.dp)
+    ) {
+        val segmentWidth = (maxWidth - 6.dp) / options.size.coerceAtLeast(1)
+        Box(
+            Modifier.offset(x = segmentWidth * animatedIndex)
+                .width(segmentWidth).heightIn(min = 48.dp).clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surface)
+        )
+        Row(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, (value, label) ->
+                val active = value == selected
+                Box(
+                    Modifier.weight(1f).selectable(active, role = Role.RadioButton, onClick = { if (!active) onSelect(value) })
+                        .heightIn(min = 48.dp).padding(horizontal = 4.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                }
             }
         }
     }

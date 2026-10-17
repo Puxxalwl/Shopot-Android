@@ -8,7 +8,21 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -103,6 +117,19 @@ private val StilleTypography = Typography(
 )
 
 @Composable
+private fun ThemeTransitionOverlay(dark: Boolean) {
+    val progress by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(420, easing = FastOutSlowInEasing),
+        label = "theme-bubble-transition"
+    )
+    Canvas(Modifier.fillMaxSize().blur(18.dp)) {
+        val radius = size.maxDimension * 0.72f * progress
+        drawCircle(if (dark) Color(0xFF0B0C0F) else Color(0xFFF7F7F9), radius)
+    }
+}
+
+@Composable
 fun StilleTheme(
     themeMode: String = "system",
     language: String = "ru",
@@ -113,6 +140,16 @@ fun StilleTheme(
         "dark" -> true
         "light" -> false
         else -> isSystemInDarkTheme()
+    }
+    var previousTheme by remember { mutableStateOf(themeMode) }
+    var transitionVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(themeMode) {
+        if (previousTheme != themeMode) {
+            previousTheme = themeMode
+            transitionVisible = true
+            delay(420)
+            transitionVisible = false
+        }
     }
 
     // Keep the existing locale behavior while the UI remains fully Compose-driven.
@@ -137,7 +174,12 @@ fun StilleTheme(
             large = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
             extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
         ),
-        content = { Surface(color = MaterialTheme.colorScheme.background, content = content) }
+        content = {
+            Box(Modifier.fillMaxSize()) {
+                Surface(color = MaterialTheme.colorScheme.background, content = content)
+                if (transitionVisible) ThemeTransitionOverlay(darkTheme)
+            }
+        }
     )
     }
 }

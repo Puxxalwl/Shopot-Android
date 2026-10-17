@@ -3,7 +3,8 @@
 # Cross-compile shopot-core (Zig) for Android arm64-v8a.
 #
 # Requires: Zig 0.17.0 (https://ziglang.org/download/)
-# Output: app/src/main/jniLibs/arm64-v8a/shopot
+# Output: app/src/main/jniLibs/arm64-v8a/libshopot.so
+# Executable (not JNI): Android extracts lib*.so into its executable native directory.
 #
 set -euo pipefail
 
@@ -44,13 +45,12 @@ echo "Zig: $(zig version)"
 cd "$REPO_DIR/zig"
 
 echo "Building with ReleaseSmall optimize..."
-zig build -Doptimize=ReleaseSmall \
+zig build -j1 -Doptimize=ReleaseSmall \
     -Dtarget=aarch64-linux-musl
 
 # 4. Output binary
 OUTPUT_DIR="$PROJECT_DIR/app/src/main/jniLibs/arm64-v8a"
-ASSETS_DIR="$PROJECT_DIR/app/src/main/assets"
-mkdir -p "$OUTPUT_DIR" "$ASSETS_DIR"
+mkdir -p "$OUTPUT_DIR"
 
 BINARY="$REPO_DIR/zig/zig-out/bin/shopot-zig"
 if [ ! -f "$BINARY" ]; then
@@ -59,9 +59,8 @@ if [ ! -f "$BINARY" ]; then
     exit 1
 fi
 
-cp "$BINARY" "$OUTPUT_DIR/shopot"
-cp "$BINARY" "$ASSETS_DIR/shopot"
-chmod 755 "$OUTPUT_DIR/shopot" "$ASSETS_DIR/shopot"
+cp "$BINARY" "$OUTPUT_DIR/libshopot.so"
+chmod 755 "$OUTPUT_DIR/libshopot.so"
 
-echo "✓ shopot-core binary: $ASSETS_DIR/shopot ($(stat -c%s "$ASSETS_DIR/shopot") bytes)"
+echo "✓ shopot-core executable: $OUTPUT_DIR/libshopot.so ($(stat -c%s "$OUTPUT_DIR/libshopot.so") bytes)"
 echo "Done."

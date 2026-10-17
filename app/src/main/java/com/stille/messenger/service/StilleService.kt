@@ -11,9 +11,6 @@ import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.os.Build
 import android.os.IBinder
-import android.system.ErrnoException
-import android.system.Os
-import android.system.OsConstants
 import androidx.core.app.NotificationCompat
 import com.stille.coreapi.FrameHeader
 import com.stille.coreapi.FrameKind
@@ -95,6 +92,10 @@ class StilleService : Service() {
                 _avatarState.value = AvatarState(error = AvatarError.REQUEST_FAILED)
             } finally { avatarMutex.unlock() }
         }
+    }
+
+    fun retryCore() {
+        if (!_isCoreReady.value && startJob?.isActive != true) startCoreIfNeeded()
     }
 
     fun createInvite(name: String) {
@@ -204,7 +205,9 @@ class StilleService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
-            ACTION_START -> {
+            ACTION_START, null -> {
+                // START_STICKY may recreate the service with a null intent.
+                // Treat that as a normal restart so the local core becomes ready again.
                 startForeground(NOTIF_ID, buildNotification())
                 startCoreIfNeeded()
             }
@@ -213,20 +216,27 @@ class StilleService : Service() {
     }
 
     // ── Core binary lifecycle ────────────────────────────────────────────
+    @Synchronized
     private fun startCoreIfNeeded() {
         if (_isCoreReady.value || startJob?.isActive == true) return
         startJob = serviceScope.launch {
             var lastError: Exception? = null
             repeat(CORE_START_ATTEMPTS) { attempt ->
+                var stage = "package"
                 try {
                     // A previous failed launch can leave a stale socket or process
                     // behind. Clean both before each attempt so connectUds never
                     // reports a false "core unavailable" state.
                     cleanupCoreRuntime()
                     coreDir.mkdirs()
-                    copyCoreBinaryIfNeeded()
+                    coreBinary()
+                    stage = "identity"
+                    ensureIdentity()
+                    stage = "process"
                     startCoreProcess()
+                    stage = "socket"
                     waitForSocket()
+                    stage = "handshake"
                     connectUds()
                     _isCoreReady.value = true
                     _inviteState.value = InviteState(ready = true)
@@ -234,6 +244,8 @@ class StilleService : Service() {
                 } catch (e: CancellationException) { throw e
                 } catch (e: Exception) {
                     lastError = e
+                    // Fixed stage and exception type only: no paths, identity or core output.
+                    android.util.Log.w("StilleService", "Core startup: $stage (${e.javaClass.simpleName})")
                     cleanupCoreRuntime()
                     if (attempt + 1 < CORE_START_ATTEMPTS) delay(CORE_RETRY_DELAY_MS)
                 }
@@ -243,68 +255,49 @@ class StilleService : Service() {
         }
     }
 
-    private fun copyCoreBinaryIfNeeded() {
-        val binaryFile = File(coreDir, "shopot")
-        if (!binaryFile.exists() || binaryFile.length() == 0L) {
-            // Prefer the asset (the build script places the core there), but
-            // accept the ABI-specific packaged native binary as a fallback.
-            // This keeps already-installed APKs working when only jniLibs was
-            // packaged by the Android build configuration.
-            val nativeBinary = File(applicationInfo.nativeLibraryDir, "shopot")
-            if (nativeBinary.isFile && nativeBinary.length() > 0L) {
-                nativeBinary.inputStream().use { input ->
-                    binaryFile.outputStream().use { output -> input.copyTo(output) }
-                }
-            } else {
-                assets.open("shopot").use { input ->
-                    binaryFile.outputStream().use { output -> input.copyTo(output) }
-                }
+    private fun coreBinary(): File = File(applicationInfo.nativeLibraryDir, "libshopot.so").also {
+        if (!it.isFile || !it.canExecute()) throw IOException("Packaged core executable unavailable")
+    }
+
+    private fun coreCommand(command: String): ProcessBuilder =
+        ProcessBuilder(coreBinary().absolutePath, command)
+            .directory(coreDir)
+            .redirectErrorStream(true)
+            // Core diagnostics can contain identities. Discard without buffers or disk files.
+            .redirectOutput(ProcessBuilder.Redirect.to(File("/dev/null")))
+            .apply {
+                environment()["HOME"] = homeDir.absolutePath
+                environment()["PATH"] = "/system/bin:/bin"
             }
-        }
-        if (!binaryFile.isFile || binaryFile.length() == 0L) {
-            throw IOException("shopot core binary is missing from the APK")
-        }
-        // Ensure executable permissions
-        val mode = 0x1FF  // 0755
+
+    /** Invoke only the core's init command; never replace an existing identity. */
+    private suspend fun ensureIdentity() {
+        val seed = File(homeDir, ".shopot/zig-seed")
+        if (!needsCoreIdentity(seed)) return
+        val process = coreCommand("init").start()
         try {
-            Os.chmod(binaryFile.absolutePath, mode)
-        } catch (e: ErrnoException) {
-            // Fallback to reflection if chmod fails
-            binaryFile.setExecutable(true, false)
+            val finished = withTimeoutOrNull(15_000) {
+                while (process.isAlive) delay(50)
+                true
+            } ?: false
+            if (!finished) throw IOException("Core identity initialization timed out")
+            if (process.exitValue() != 0 || needsCoreIdentity(seed)) {
+                throw IOException("Core identity initialization failed")
+            }
+        } finally {
+            if (process.isAlive) process.destroyForcibly()
         }
     }
 
     private fun startCoreProcess() {
-        val binaryFile = File(coreDir, "shopot")
-        if (!binaryFile.exists()) {
-            throw RuntimeException("shopot binary not found")
-        }
-
-        val processBuilder = ProcessBuilder(binaryFile.absolutePath, "serve")
-        processBuilder.environment()["HOME"] = homeDir.absolutePath
-        processBuilder.environment()["PATH"] = "/system/bin:/bin"
-        processBuilder.redirectErrorStream(true)
-
-        coreProcess = processBuilder.start()
-
-        // Read any core output for diagnostics (redacted)
-        serviceScope.launch {
-            try {
-                coreProcess?.inputStream?.bufferedReader()
-                    ?.useLines { lines ->
-                        lines.forEach { line ->
-                            // Diagnostics only — no sensitive data from core
-                            // Drain stdout without exposing possible invite secrets or identities.
-                        }
-                    }
-            } catch (_: Exception) { }
-        }
+        coreProcess = coreCommand("serve").start()
     }
 
     private suspend fun waitForSocket(timeoutMs: Long = 10_000) {
         val socketFile = File(socketPath)
         val start = System.currentTimeMillis()
         while (!socketFile.exists() && System.currentTimeMillis() - start < timeoutMs) {
+            if (coreProcess?.isAlive != true) throw IOException("Core exited before socket startup")
             delay(100)
         }
         if (!socketFile.exists()) {

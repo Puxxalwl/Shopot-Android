@@ -18,6 +18,7 @@ local.properties
 .dsh/
 
 # Generated Android core binary; the source is tracked as a git submodule.
+app/src/main/jniLibs/arm64-v8a/libshopot.so
 app/src/main/jniLibs/arm64-v8a/shopot
 app/src/main/assets/shopot
 

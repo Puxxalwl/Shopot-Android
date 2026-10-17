@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Added a short animated motion-blur transition to the Welcome screen when setup is completed; other windows remain unchanged.
+- Added a theme-switch transition that expands a softly blurred square-like bubble into the new light or dark background, plus a lazy sliding square indicator for segmented choices.
+- Replaced launcher resources with the supplied minimal Stille Android icon package: correctly named `ic_launcher.png` and `ic_launcher_round.png` variants for ldpi through xxxhdpi, plus a 512px master source. Removed the old transparent adaptive foreground so installed-app icons use the supplied artwork.
 - Profile photo selection with off-thread, bounded EXIF-aware center cropping and JPEG encoding (8 MiB source, ≤16,000-byte upload); SET_AVATAR acknowledgement gates success and errors keep the previous photo. No new dependencies or plaintext disk cache.
 - Memory-only avatar display in Profile, Chats, Contacts and conversation headers, capped at 20 images including own photo. Peer images require confirmed JOIN, matching content id and bounded decoded dimensions. Own preview cannot be restored after process death with the current core API; see README.
 - Invitations through the existing binary CREATE_INVITE/ACCEPT_INVITE methods, with a bound-service state flow, explicit offline/error/waiting states, one-time code reuse, copy/share actions and QR image import. New contact identity is shown only after CONTACT_JOINED.
@@ -22,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Replaced abrupt main-tab crossfades with swipeable sections, synchronized bottom navigation and 360ms eased tap transitions. Added bounded directional motion-blur approximation on Android 12+ (sharp at rest), slide/scale/fade fallback on older Android, and animated conversation entry/back to the source section.
-- Fixed InviteOrQr reporting an unavailable local core after a transient startup failure: stale UDS sockets and failed core processes are cleaned up, startup retries are bounded, and the packaged ABI binary is used when the asset copy is unavailable.
+- Fixed local-core packaging and startup: package the AArch64 executable as `libshopot.so`, extract via native packaging and execute directly from `nativeLibraryDir` rather than writable app data (blocked on Android 10+). APK packaging rejects a missing/wrong-architecture core.
+- Initialize a missing core identity once before `serve`, preserve existing/malformed seeds, bound and cancel init, discard process output, and log only fixed startup stages/error types. Restore START_STICKY launches and add retry actions to invitations/profile; no protocol or encryption changes.
 - Added softly blended blue/lilac background gradients, translucent highlighted surfaces, gradient avatars and a rounded floating navigation capsule with short selection feedback. These are lightweight glass-inspired effects, not a simulated full-screen blur/refraction engine.
 - Redesigned welcome, chats, contacts, conversation, profile, settings and tab navigation with neutral surfaces, inset list separators, semantic light/dark colors, a single blue accent and consistent typography. See [UI direction and research](docs/UI-DESIGN.md) ([Russian](ru/UI-DESIGN.md)).
 - Added working local name search, an explicit profile Save action, reactive language/theme values and a system appearance option in settings. Removed inert call/attachment/menu controls.

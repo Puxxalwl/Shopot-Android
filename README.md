@@ -29,6 +29,11 @@ Generated examples are in [docs/screenshots](docs/screenshots):
 
 Regenerate them with `python3 tools/generate_screenshots.py`. The supplied
 Stille logo is stored at `app/src/main/res/drawable-nodpi/stille_logo.png`.
+Installed-app launcher icons use the supplied minimal density set in
+`app/src/main/res/mipmap-*`, with `ic_launcher.png` and `ic_launcher_round.png`
+names. The 512px source is retained at
+`app/src/main/res/drawable-nodpi/stille_launcher_master.png`; this is not a Play
+Market asset set.
 
 ## First launch
 
@@ -78,7 +83,7 @@ is implemented.
 
 ```bash
 # 1. Build shopot-core binary for Android arm64-v8a
-./tools/build-core.sh
+bash ./tools/build-core.sh
 
 # 2. Build the Android app
 ./gradlew :app:assembleDebug
@@ -103,10 +108,22 @@ core-src/                 # shopot-core source (git submodule / cloned)
 
 The `data` module implements the binary UDS protocol codec. The
 `StilleService` foreground service:
-1. Extracts and starts the `shopot` binary from assets
-2. Connects to `~/.shopot/api.sock` (UDS)
-3. Sends `GET_VERSION` to verify core compatibility
-4. Listens for events and broadcasts them to the UI via `StateFlow`
+1. Uses `libshopot.so` from Android's installed `nativeLibraryDir` (an executable, not JNI)
+2. Creates the local core identity once with `shopot init`, never overwriting an existing seed
+3. Starts `shopot serve` and connects to `~/.shopot/api.sock` (UDS)
+4. Sends `GET_VERSION` to verify core compatibility
+5. Listens for events and broadcasts them to the UI via `StateFlow`
+
+If invites or profile photo actions say that the local core is unavailable,
+rebuild the APK after `bash ./tools/build-core.sh`. The APK must contain
+`lib/arm64-v8a/libshopot.so`, generated from
+`app/src/main/jniLibs/arm64-v8a/libshopot.so` (ignored by Git).
+Packaging enables native extraction: Android 10+ blocks execution from writable
+app data, so an asset copied into `filesDir` cannot be used. APK packaging fails
+if the AArch64 core is missing; Kotlin-only checks need no binary. Profile and
+invite screens offer a retry action. Startup logs contain only fixed stages and
+exception types, never core output or identities. Install the updated APK over
+the existing app; do not clear data to troubleshoot startup.
 
 ### Adding a friend
 

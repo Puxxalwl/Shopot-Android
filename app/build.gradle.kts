@@ -34,6 +34,11 @@ android {
     }
 
     packagingOptions {
+        jniLibs {
+            // ProcessBuilder needs a real executable file, not a ZIP entry.
+            useLegacyPackaging = true
+            keepDebugSymbols += "**/libshopot.so"
+        }
         resources {
             excludes += setOf(
                 "META-INF/{AL2.0,LGPL2.1}",
@@ -80,6 +85,27 @@ android {
         checkReleaseBuilds = false
     }
 }
+
+// Keep compile-only checks lightweight, but never produce an APK without its core.
+val verifyCoreBinary by tasks.registering {
+    val binary = layout.projectDirectory.file("src/main/jniLibs/arm64-v8a/libshopot.so")
+    inputs.file(binary).optional()
+    doLast {
+        val file = binary.asFile
+        check(file.isFile && file.length() > 64) {
+            "Android core is missing. Run: bash tools/build-core.sh"
+        }
+        val header = file.inputStream().use { it.readNBytes(20) }
+        check(header[0] == 0x7f.toByte() && header[1] == 69.toByte() &&
+            header[2] == 76.toByte() && header[3] == 70.toByte() &&
+            header[4] == 2.toByte() && header[5] == 1.toByte() &&
+            header[18] == 0xb7.toByte() && header[19] == 0.toByte()) {
+            "Android core must be a little-endian AArch64 ELF executable"
+        }
+    }
+}
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("NativeLibs") }
+    .configureEach { dependsOn(verifyCoreBinary) }
 
 dependencies {
     implementation(project(":data"))

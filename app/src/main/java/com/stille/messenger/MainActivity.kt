@@ -144,6 +144,7 @@ fun StilleApp(
         state = inviteState,
         onCreate = { coreService?.createInvite(name) },
         onAccept = { coreService?.acceptInvite(it, name) },
+        onRetryCore = { coreService?.retryCore() },
         onClose = { showInvite = false }
     )
     Box(modifier = Modifier.fillMaxSize()) {
@@ -180,7 +181,7 @@ fun StilleApp(
                 )
                 "profile" -> ProfileScreen(
                     name = name, avatarBytes = avatarMap[0], avatarState = avatarState,
-                    coreReady = inviteState.ready, onSetName = onNameChange,
+                    coreReady = inviteState.ready, onRetryCore = { coreService?.retryCore() }, onSetName = onNameChange,
                     onSetAvatar = { avatarPicker.launch("image/*") }
                 )
                 "settings" -> SettingsScreen(

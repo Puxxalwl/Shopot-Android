@@ -202,7 +202,7 @@ fun MessageRow(message: Message) {
 @Composable
 fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null,
     avatarState: com.stille.messenger.service.AvatarState = com.stille.messenger.service.AvatarState(),
-    coreReady: Boolean = false, onSetName: (String) -> Unit, onSetAvatar: () -> Unit) {
+    coreReady: Boolean = false, onRetryCore: () -> Unit = {}, onSetName: (String) -> Unit, onSetAvatar: () -> Unit) {
     var draft by rememberSaveable(name) { mutableStateOf(name) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { ScreenTitle(copy("Профиль", "Profile")) }
@@ -217,7 +217,10 @@ fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null,
                     CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                     Text(copy("Подготовка и сохранение…", "Preparing and saving…"), style = MaterialTheme.typography.bodySmall)
                 }
-                if (!coreReady) Text(copy("Для сохранения фото нужно запущенное ядро", "The core must be running to save your photo"), style = MaterialTheme.typography.bodySmall)
+                if (!coreReady) {
+                    Text(copy("Для сохранения фото нужно запущенное ядро", "The core must be running to save your photo"), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = onRetryCore) { Text(copy("Повторить запуск", "Retry core")) }
+                }
                 if (avatarState.saved) Text(copy("Фото сохранено", "Photo saved"), color = MaterialTheme.colorScheme.primary)
                 avatarState.error?.let { error ->
                     Text(when (error) {
