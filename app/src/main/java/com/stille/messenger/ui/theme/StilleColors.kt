@@ -1,14 +1,15 @@
 package com.stille.messenger.ui.theme
 
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 
-/**
- * Static holders so @Composable functions can access theme state
- * without needing to thread parameters through every call.
- */
+internal data class StilleAppearance(val isDark: Boolean, val themeMode: String, val language: String)
+internal val LocalStilleAppearance = staticCompositionLocalOf { StilleAppearance(false, "system", "ru") }
+
+/** Composition-scoped values: language/theme changes invalidate every reader. */
 object StilleColors {
-    var isDark: Boolean = false
-    var darkTheme: Boolean = false
-    var language: String = "ru"
-    val blueAccent = Color(0xFF007AFF)
+    val isDark: Boolean
+        @Composable get() = LocalStilleAppearance.current.isDark
+    val language: String
+        @Composable get() = LocalStilleAppearance.current.language
 }

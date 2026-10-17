@@ -2,66 +2,24 @@ package com.stille.messenger.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.SettingsBrightness
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.stille.messenger.R
 import com.stille.messenger.ui.ProfileName
-import com.stille.messenger.ui.theme.StilleColors
-
-private val WelcomeBlue = Color(0xFF1683FF)
-private val WelcomePurple = Color(0xFF8B6DFF)
+import com.stille.messenger.ui.components.GlassSurface
+import com.stille.messenger.ui.components.SegmentedChoice
 
 @Composable
 fun WelcomeScreen(
@@ -74,268 +32,78 @@ fun WelcomeScreen(
 ) {
     var name by rememberSaveable { mutableStateOf(initialName) }
     var language by rememberSaveable { mutableStateOf(initialLanguage) }
-    var themeMode by rememberSaveable { mutableStateOf(initialThemeMode) }
-    var showAbout by rememberSaveable { mutableStateOf(false) }
-    val isEnglish = language == "en"
-    val isDark = StilleColors.isDark
-    val foreground = if (isDark) Color.White else Color(0xFF182235)
-    val muted = if (isDark) Color(0xFFD0D6E4) else Color(0xFF48556C)
-    val card = if (isDark) Color(0xFF202838) else Color(0xFFF5F7FC)
-    val border = if (isDark) Color(0x38FFFFFF) else Color(0xB8FFFFFF)
-
-    val nameBytes = ProfileName.byteLength(name.trim())
-    val validName = ProfileName.isValid(name)
-    val title = if (isEnglish) "Welcome to Stille" else "Добро пожаловать в Stille"
-    val subtitle = if (isEnglish) "A quieter place for your conversations" else "Тихое место для ваших разговоров"
-    val nameTitle = if (isEnglish) "Your name" else "Ваше имя"
-    val nameHint = if (isEnglish) "How should we call you?" else "Как к вам обращаться?"
-    val languageTitle = if (isEnglish) "Language" else "Язык интерфейса"
-    val themeTitle = if (isEnglish) "Appearance" else "Оформление"
-    val continueLabel = if (isEnglish) "Continue" else "Продолжить"
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(if (isDark) Color(0xFF101522) else Color(0xFFF1F4FA)))
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            WelcomeBlue.copy(alpha = if (isDark) 0.25f else 0.12f),
-                            Color.Transparent,
-                            WelcomePurple.copy(alpha = if (isDark) 0.22f else 0.10f)
-                        )
-                    )
-                )
-        )
+    var theme by rememberSaveable { mutableStateOf(initialThemeMode) }
+    var about by rememberSaveable { mutableStateOf(false) }
+    val english = language == "en"
+    Box(Modifier.fillMaxSize()) {
+    WallpaperBackground()
+    Column(
+        Modifier.fillMaxSize()
+            .statusBarsPadding().navigationBarsPadding().imePadding(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
+            Modifier.weight(1f).widthIn(max = 560.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Image(
-                    painter = painterResource(R.drawable.stille_logo),
-                    contentDescription = "Stille Messenger",
-                    modifier = Modifier.size(110.dp)
-                )
-                Spacer(modifier = Modifier.height(18.dp))
-                Text(
-                    text = title,
-                    color = foreground,
-                    fontSize = 29.sp,
-                    lineHeight = 34.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(7.dp))
-                Text(text = subtitle, color = muted, fontSize = 15.sp)
-                Spacer(modifier = Modifier.height(24.dp))
-
-                GlassPanel(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
-                    color = card,
-                    borderColor = border
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
-                    ) {
-                        SectionLabel(icon = Icons.Default.Person, text = nameTitle, color = foreground)
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { value -> name = ProfileName.limitInput(value) },
-                            isError = nameBytes > ProfileName.MAX_BYTES,
-                            supportingText = {
-                                Text("$nameBytes / 32", color = muted)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            shape = RoundedCornerShape(17.dp),
-                            placeholder = { Text(nameHint, color = muted) },
-                            keyboardOptions = KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Words,
-                                keyboardType = KeyboardType.Text
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White.copy(alpha = if (isDark) 0.08f else 0.52f),
-                                unfocusedContainerColor = Color.White.copy(alpha = if (isDark) 0.05f else 0.36f),
-                                focusedBorderColor = WelcomeBlue,
-                                unfocusedBorderColor = border,
-                                focusedTextColor = foreground,
-                                unfocusedTextColor = foreground,
-                                cursorColor = WelcomeBlue,
-                                focusedLeadingIconColor = WelcomeBlue,
-                                unfocusedLeadingIconColor = WelcomeBlue
-                            )
-                        )
-
-                        SectionLabel(icon = Icons.Default.Language, text = languageTitle, color = foreground)
-                        SegmentedChoice(
-                            options = if (isEnglish) listOf("ru" to "Russian", "en" to "English")
-                            else listOf("ru" to "Русский", "en" to "English"),
-                            selected = language,
-                            onSelect = {
-                                language = it
-                                onLanguagePreview(it)
-                            },
-                            foreground = foreground,
-                            muted = muted,
-                            selectedColor = WelcomeBlue
-                        )
-
-                        SectionLabel(
-                            icon = when (themeMode) {
-                                "dark" -> Icons.Default.DarkMode
-                                "light" -> Icons.Default.LightMode
-                                else -> Icons.Default.SettingsBrightness
-                            },
-                            text = themeTitle,
-                            color = foreground
-                        )
-                        SegmentedChoice(
-                            options = if (isEnglish) {
-                                listOf("system" to "System", "light" to "Light", "dark" to "Dark")
-                            } else {
-                                listOf("system" to "Системная", "light" to "Светлая", "dark" to "Тёмная")
-                            },
-                            selected = themeMode,
-                            onSelect = {
-                                themeMode = it
-                                onThemePreview(it)
-                            },
-                            foreground = foreground,
-                            muted = muted,
-                            selectedColor = WelcomePurple
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            GlassActionButton(
-                label = continueLabel,
-                enabled = validName,
-                onClick = { onComplete(name.trim(), language, themeMode) }
+            Spacer(Modifier.height(8.dp))
+            Image(painterResource(R.drawable.stille_logo), null, Modifier.size(88.dp))
+            Spacer(Modifier.height(20.dp))
+            Text("Stille", style = MaterialTheme.typography.displaySmall)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (english) "Just you. And your conversations." else "Только вы. И ваши разговоры.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
-            TextButton(onClick = { showAbout = true }) {
-                Text(if (isEnglish) "Why Stille?" else "Почему Stille?", color = foreground)
-            }
-        }
-    }
-    if (showAbout) {
-        AlertDialog(
-            onDismissRequest = { showAbout = false },
-            title = { Text(if (isEnglish) "Why Stille?" else "Почему Stille?") },
-            text = {
-                Text(if (isEnglish)
-                    "Stille is an open-source client for shopot-core. The client has no analytics or advertising SDKs. Connections and encryption are handled by the local core, not by a Stille server.\n\nOpen source is not a guarantee of security: device security, the core version and connection settings also matter."
-                else
-                    "Stille — открытый клиент для shopot-core. В клиенте нет аналитики и рекламных SDK. Соединениями и шифрованием занимается локальное ядро, а не сервер Stille.\n\nОткрытый код сам по себе не гарантирует безопасность: важны защита устройства, версия ядра и настройки соединения.")
-            },
-            confirmButton = { TextButton(onClick = { showAbout = false }) { Text(if (isEnglish) "Got it" else "Понятно") } }
-        )
-    }
-
-}
-
-@Composable
-private fun SectionLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = WelcomeBlue, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.width(9.dp))
-        Text(text = text, color = color, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun SegmentedChoice(
-    options: List<Pair<String, String>>,
-    selected: String,
-    onSelect: (String) -> Unit,
-    foreground: Color,
-    muted: Color,
-    selectedColor: Color
-) {
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        // Keep the visible track compact without shrinking the touch targets.
-        Box(
-            modifier = Modifier.fillMaxWidth().height(36.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (StilleColors.isDark) Color(0xFF303B50) else Color(0xFFE0E6F0))
-        )
-        Row(modifier = Modifier.fillMaxWidth().selectableGroup()) {
-        options.forEach { (value, label) ->
-            val active = value == selected
-            Box(
-                modifier = Modifier.weight(1f).height(48.dp)
-                    .selectable(selected = active, role = Role.RadioButton, onClick = { onSelect(value) }),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp).height(32.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (active) {
-                            selectedColor
-                        } else Color.Transparent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(label, color = foreground, fontSize = 13.sp,
-                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+            Spacer(Modifier.height(32.dp))
+            GlassSurface(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp)) {
+                    Text(if (english) "Your name" else "Ваше имя", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = name, onValueChange = { name = ProfileName.limitInput(it) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        placeholder = { Text(if (english) "How should we call you?" else "Как к вам обращаться?") },
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                        colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant)
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    Text(if (english) "Language" else "Язык", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(10.dp))
+                    SegmentedChoice(listOf("ru" to "Русский", "en" to "English"), language, {
+                        language = it
+                        onLanguagePreview(it)
+                    })
+                    Spacer(Modifier.height(24.dp))
+                    Text(if (english) "Appearance" else "Оформление", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(10.dp))
+                    SegmentedChoice(
+                        if (english) listOf("system" to "Auto", "light" to "Light", "dark" to "Dark") else listOf("system" to "Авто", "light" to "Светлое", "dark" to "Тёмное"),
+                        theme, { theme = it; onThemePreview(it) }
+                    )
                 }
             }
         }
+        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Button(
+                onClick = { onComplete(name.trim(), language, theme) },
+                enabled = ProfileName.isValid(name),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) { Text(if (english) "Continue" else "Продолжить", style = MaterialTheme.typography.labelLarge) }
+            TextButton(onClick = { about = true }) { Text(if (english) "Why Stille?" else "Почему Stille?", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
-}
-
-@Composable
-private fun GlassActionButton(label: String, enabled: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(shape)
-            .background(
-                if (enabled) Brush.horizontalGradient(listOf(WelcomeBlue, WelcomePurple))
-                else Brush.horizontalGradient(listOf(Color(0x668AA4C2), Color(0x668AA4C2)))
-            )
-            .border(1.dp, Color.White.copy(alpha = if (enabled) 0.38f else 0.15f), shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.55f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
-}
-
-@Composable
-private fun GlassPanel(
-    modifier: Modifier,
-    shape: Shape,
-    color: Color,
-    borderColor: Color,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(color.copy(alpha = (color.alpha + 0.08f).coerceAtMost(1f)), color)
-                )
-            )
-            .border(1.dp, borderColor, shape)
-    ) {
-        content()
-    }
+    if (about) AlertDialog(
+        onDismissRequest = { about = false },
+        title = { Text(if (english) "Why Stille?" else "Почему Stille?") },
+        text = { Text(if (english)
+            "Stille is an open-source client for shopot-core. No advertising SDKs or analytics. Connections and encryption are handled by the local core, not a Stille server.\n\nOpen source alone does not guarantee security. Your device, core version and connection settings matter too."
+        else "Stille — открытый клиент для shopot-core. Без рекламных SDK и аналитики. Соединениями и шифрованием занимается локальное ядро, а не сервер Stille.\n\nОткрытый код сам по себе не гарантирует безопасность: важны защита устройства, версия ядра и настройки соединения.") },
+        confirmButton = { TextButton(onClick = { about = false }) { Text(if (english) "Got it" else "Понятно") } }
+    )
 }

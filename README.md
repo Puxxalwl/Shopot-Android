@@ -60,6 +60,9 @@ while the form scrolls. The Android application ID is now `com.stille.messenger`
 
 # 3. (optional) Run tests
 ./gradlew :data:testDebugUnitTest :app:testDebugUnitTest
+
+# Fast incremental Kotlin check (keeps Gradle/Kotlin daemons warm)
+./gradlew :app:compileDebugKotlin --daemon --offline --max-workers=2
 ```
 
 ### Architecture
@@ -82,10 +85,17 @@ The `data` module implements the binary UDS protocol codec. The
 
 ### Adding a friend
 
+Open the invite action from Chats or Contacts. Stille creates a one-time invite
+through the binary `CREATE_INVITE` API and keeps it in memory only. You can share
+the link, copy it, or show a black-and-white QR with the symbol-only Stille mark
+(no wordmark). The recipient can paste the link or choose a QR image; Stille
+accepts it through `ACCEPT_INVITE` and shows the contact only after the trusted
+`CONTACT_JOINED` event.
+
 ```
 A: CREATE_INVITE → "shopot://i/ABC123..."
-   (share over any messenger)
-B: ACCEPT_INVITE → connected
+   (share over any messenger or QR)
+B: ACCEPT_INVITE → wait for CONTACT_JOINED → connected
 ```
 
 ## Documentation

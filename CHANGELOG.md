@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Invitations through the existing binary CREATE_INVITE/ACCEPT_INVITE methods, with a bound-service state flow, explicit offline/error/waiting states, one-time code reuse, copy/share actions and QR image import. New contact identity is shown only after CONTACT_JOINED.
+- Branded black-on-white QR with a symbol-only monochrome mask derived from the original Stille logo. Each decorated raster is decoded before display; a verified undecorated code is the fallback. Added ZXing core 3.5.3 solely for offline QR encode/decode, with no networking SDK or cryptography changes.
 - First-run welcome setup with language, theme, and display-name selection
 - Initial project skeleton: Gradle multi-module structure, AGENTS.md
 - Binary protocol codec for CORE-API 2.2.0 (`data` KMP module): Frame header
@@ -17,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Cross-compilation tooling for shopot-core as `aarch64-linux-musl`
 
 ### Changed
+- Added softly blended blue/lilac background gradients, translucent highlighted surfaces, gradient avatars and a rounded floating navigation capsule with short selection feedback. These are lightweight glass-inspired effects, not a simulated full-screen blur/refraction engine.
+- Redesigned welcome, chats, contacts, conversation, profile, settings and tab navigation with neutral surfaces, inset list separators, semantic light/dark colors, a single blue accent and consistent typography. See [UI direction and research](docs/UI-DESIGN.md) ([Russian](ru/UI-DESIGN.md)).
+- Added working local name search, an explicit profile Save action, reactive language/theme values and a system appearance option in settings. Removed inert call/attachment/menu controls.
+- Shortened tab transitions to 180ms without delaying callbacks, cached list preparation, bounded conversation rendering to 200 messages, kept the keyboard open after sending and moved profile image loading to Coil without disk caching. These changes have not been device-benchmarked.
+- Refreshed the main chats screen with a theme-aware gradient background, rounded translucent panels, floating navigation and a first-conversation empty state. Glass surfaces now honor their background color and clip content to their rounded shape.
 - Improved welcome contrast with controlled backgrounds, enlarged the transparent logo, removed the name-field icon and technical counter wording, and added compact single-choice controls and a bilingual “Why Stille?” explanation.
 - Used the background logo exclusively for launcher icons.
 - Rebranded the Android project as `stille` / Stille Messenger with a transparent logo and updated launcher icons; changed the application ID to `com.stille.messenger` (a separate installation without automatic data migration).

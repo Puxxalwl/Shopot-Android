@@ -51,6 +51,64 @@ class StilleService : Service() {
     private var requestId = 0
 
     // State exposed to UI
+    private val _inviteState = MutableStateFlow(InviteState())
+    val inviteState = _inviteState.asStateFlow()
+    private val inviteMutex = Mutex()
+    private var startJob: Job? = null
+    private val _confirmedContacts = MutableStateFlow<List<com.stille.coreapi.Contact>>(emptyList())
+    val confirmedContacts = _confirmedContacts.asStateFlow()
+
+    fun createInvite(name: String) {
+        serviceScope.launch {
+            if (!inviteMutex.tryLock()) return@launch
+            try {
+                if (!_isCoreReady.value) {
+                    _inviteState.value = _inviteState.value.copy(error = InviteError.CORE_UNAVAILABLE)
+                    return@launch
+                }
+                // Reuse the live code instead of exhausting the four-invite core registry.
+                if (_inviteState.value.code != null) return@launch
+                _inviteState.value = _inviteState.value.copy(busy = true, error = null, joined = false)
+                val response = sendRequest(Method.CREATE_INVITE, Requests.createInvite(name, ""))
+                val code = Responses.decodeCreateInvite(response.second)
+                _inviteState.value = _inviteState.value.copy(code = code, busy = false)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) {
+                _inviteState.value = _inviteState.value.copy(busy = false, error = inviteError(e))
+            } finally { inviteMutex.unlock() }
+        }
+    }
+
+    fun acceptInvite(code: String, name: String) {
+        serviceScope.launch {
+            if (!inviteMutex.tryLock()) return@launch
+            try {
+                if (!_isCoreReady.value) {
+                    _inviteState.value = _inviteState.value.copy(error = InviteError.CORE_UNAVAILABLE)
+                    return@launch
+                }
+                if (!validInviteInput(code.trim())) {
+                    _inviteState.value = _inviteState.value.copy(error = InviteError.INVALID_CODE)
+                    return@launch
+                }
+                _inviteState.value = _inviteState.value.copy(busy = true, error = null, accepted = false, joined = false)
+                val response = sendRequest(Method.ACCEPT_INVITE, Requests.acceptInvite(code.trim(), name))
+                Responses.decodeAcceptInvite(response.second)
+                // A cid alone is not authenticated identity: wait for CONTACT_JOINED.
+                _inviteState.value = _inviteState.value.copy(busy = false, accepted = true)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) {
+                _inviteState.value = _inviteState.value.copy(busy = false, error = inviteError(e))
+            } finally { inviteMutex.unlock() }
+        }
+    }
+
+    private fun inviteError(error: Exception): InviteError = when ((error as? ProtocolStatusException)?.code) {
+        com.stille.coreapi.status.BAD_INVITE_CODE -> InviteError.INVALID_CODE
+        com.stille.coreapi.status.TOO_MANY_INVITES -> InviteError.LIMIT_REACHED
+        else -> InviteError.REQUEST_FAILED
+    }
+
     private val _isCoreReady = MutableStateFlow(false)
     val isCoreReady = _isCoreReady.asStateFlow()
 
@@ -100,6 +158,7 @@ class StilleService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                startJob?.cancel()
                 stopCore()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -114,15 +173,20 @@ class StilleService : Service() {
 
     // ── Core binary lifecycle ────────────────────────────────────────────
     private fun startCoreIfNeeded() {
-        serviceScope.launch {
+        if (_isCoreReady.value || startJob?.isActive == true) return
+        startJob = serviceScope.launch {
             try {
+                coreDir.mkdirs()
                 copyCoreBinaryIfNeeded()
                 startCoreProcess()
                 waitForSocket()
                 connectUds()
                 _isCoreReady.value = true
+                _inviteState.value = InviteState(ready = true)
+            } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
-                _events.emit(CoreEvent.Error(e.message ?: "Unknown error"))
+                _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
+                _events.emit(CoreEvent.Error("Core unavailable"))
             }
         }
     }
@@ -166,7 +230,7 @@ class StilleService : Service() {
                     ?.useLines { lines ->
                         lines.forEach { line ->
                             // Diagnostics only — no sensitive data from core
-                            android.util.Log.d("StilleService", "core: ${line.take(120)}")
+                            // Drain stdout without exposing possible invite secrets or identities.
                         }
                     }
             } catch (_: Exception) { }
@@ -255,6 +319,9 @@ class StilleService : Service() {
                 }
                 8 -> {  // CONTACT_JOINED
                     val ev = com.stille.coreapi.Events.decodeContactJoined(payload)
+                    _confirmedContacts.value = (_confirmedContacts.value.filterNot { it.cid == ev.cid } +
+                        com.stille.coreapi.Contact(ev.cid, true, false, 0L, ev.name)).takeLast(200)
+                    _inviteState.value = _inviteState.value.copy(code = null, accepted = false, joined = true)
                     _events.emit(com.stille.messenger.service.CoreEvent.ContactJoined(ev.cid, ev.name))
                 }
                 12 -> { // CONTACT_CARD
@@ -316,7 +383,7 @@ class StilleService : Service() {
      * Throws [ProtocolException] with a human-readable status name if the
      * response status is non-zero.
      */
-    suspend fun sendRequest(method: Method, payload: ByteArray = EMPTY_PAYLOAD): Pair<FrameHeader, ByteArray> {
+    suspend fun sendRequest(method: Method, payload: ByteArray = EMPTY_PAYLOAD): Pair<FrameHeader, ByteArray> = withContext(Dispatchers.IO) {
         val deferred: CompletableDeferred<Pair<FrameHeader, ByteArray>>
         val reqId: Int
         requestMutex.withLock {
@@ -334,7 +401,7 @@ class StilleService : Service() {
             }
         }
 
-        return try {
+        try {
             val (header, responsePayload) = withTimeout(30_000) { deferred.await() }
             if (header.requestId != reqId) throw ProtocolException("request correlation mismatch")
             if (header.status != com.stille.coreapi.status.OK) {
@@ -362,16 +429,25 @@ class StilleService : Service() {
         outputStream = null
         pendingResponses.values.forEach { it.cancel() }
         pendingResponses.clear()
+        startJob?.cancel()
+        startJob = null
         _isCoreReady.value = false
+        _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
+        _confirmedContacts.value = emptyList()
         coreProcess?.destroy()
         coreProcess = null
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    inner class LocalBinder : android.os.Binder() {
+        val service: StilleService get() = this@StilleService
+    }
+    private val binder = LocalBinder()
+    override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
         super.onDestroy()
         stopCore()
+        serviceScope.cancel()
     }
 
     private fun createNotificationChannel() {

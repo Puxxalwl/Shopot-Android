@@ -1,9 +1,7 @@
 package com.stille.messenger.ui.screens
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,103 +10,69 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.PeopleOutline
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import com.stille.coreapi.Contact
 import com.stille.coreapi.Entity
 import com.stille.coreapi.Message
-import com.stille.messenger.ui.components.ChatBubble
-import com.stille.messenger.ui.components.GlassSurface
-import com.stille.messenger.ui.components.MenuItem
-import com.stille.messenger.ui.components.ThreeDotMenu
-import com.stille.messenger.ui.components.TopAppBarWithSearch
+import com.stille.messenger.ui.ProfileName
+import com.stille.messenger.ui.components.*
+import com.stille.messenger.ui.theme.StilleColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// ─── Wallpaper background (blur source) ────────────────────────────────────
+@Composable
+private fun copy(ru: String, en: String) = if (StilleColors.language == "en") en else ru
 
 @Composable
 fun WallpaperBackground(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val wallpaperBitmap = try {
-        val wm = android.app.WallpaperManager.getInstance(context)
-        val drawable = wm.drawable
-        drawable?.let {
-            val bmp = android.graphics.Bitmap.createBitmap(
-                it.intrinsicWidth.coerceAtLeast(1),
-                it.intrinsicHeight.coerceAtLeast(1),
-                android.graphics.Bitmap.Config.ARGB_8888
-            )
-            val canvas = android.graphics.Canvas(bmp)
-            it.setBounds(0, 0, canvas.width, canvas.height)
-            it.draw(canvas)
-            bmp.asImageBitmap()
-        }
-    } catch (_: Exception) {
-        null
-    }
-
-    if (wallpaperBitmap != null) {
-        Image(
-            bitmap = wallpaperBitmap,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = modifier.fillMaxSize()
+    val dark = StilleColors.isDark
+    val base = MaterialTheme.colorScheme.background
+    Box(modifier.fillMaxSize().background(base).drawWithCache {
+        val top = androidx.compose.ui.graphics.Brush.radialGradient(
+            listOf(if (dark) androidx.compose.ui.graphics.Color(0xFF253B63) else androidx.compose.ui.graphics.Color(0xFFD8E6FF), androidx.compose.ui.graphics.Color.Transparent),
+            center = androidx.compose.ui.geometry.Offset(size.width * 0.05f, size.height * 0.08f), radius = size.width * 1.25f
         )
-    } else {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color(0xFFE0E0E0), Color(0xFFBDBDBD))
-                    )
-                )
+        val lower = androidx.compose.ui.graphics.Brush.radialGradient(
+            listOf(if (dark) androidx.compose.ui.graphics.Color(0xFF34294F) else androidx.compose.ui.graphics.Color(0xFFE8DFF7), androidx.compose.ui.graphics.Color.Transparent),
+            center = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.7f), radius = size.width * 1.15f
         )
-    }
+        onDrawBehind { drawRect(top); drawRect(lower) }
+    })
 }
 
-fun formatTime(tsMs: Long): String {
+fun formatTime(tsMs: Long, language: String = "ru"): String {
     if (tsMs == 0L) return ""
-    val now = System.currentTimeMillis()
-    val diff = now - tsMs
+    val diff = System.currentTimeMillis() - tsMs
+    val locale = Locale(language)
     return when {
-        diff < 60_000 -> "сейчас"
-        diff < 24 * 3600_000 -> SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(tsMs))
-        diff < 7 * 24 * 3600_000 -> SimpleDateFormat("EEE", Locale("ru")).format(Date(tsMs))
-        else -> SimpleDateFormat("dd.MM", Locale.getDefault()).format(Date(tsMs))
+        diff in 0 until 60_000 -> if (language == "en") "now" else "сейчас"
+        diff < 24 * 3600_000 -> SimpleDateFormat("HH:mm", locale).format(Date(tsMs))
+        diff < 7 * 24 * 3600_000 -> SimpleDateFormat("EEE", locale).format(Date(tsMs))
+        else -> SimpleDateFormat("dd.MM", locale).format(Date(tsMs))
     }
 }
-
-// ─── Chats list screen ─────────────────────────────────────────────────────
 
 @Composable
 fun ChatsScreen(
@@ -117,96 +81,56 @@ fun ChatsScreen(
     modifier: Modifier = Modifier,
     contacts: List<Contact> = emptyList(),
     lastMessage: Map<Int, Message?> = emptyMap(),
-    lastMessageTime: Map<Int, Long> = emptyMap()
+    lastMessageTime: Map<Int, Long> = emptyMap(),
+    onInvite: () -> Unit = {}
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        GlassSurface(
-            modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 0.dp
-        ) {
-            TopAppBarWithSearch(
-                title = "Чаты",
-                searchHint = "Поиск контактов и сообщений",
-                onSearchChange = { },
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+    var query by rememberSaveable { mutableStateOf("") }
+    val sorted = remember(contacts, lastMessageTime) { contacts.sortedByDescending { lastMessageTime[it.cid] ?: 0L } }
+    val visible = remember(sorted, query) { com.stille.messenger.ui.filterContacts(sorted, query) }
+    Column(modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            ScreenTitle(copy("Чаты", "Chats"), Modifier.weight(1f))
+            FilledTonalIconButton(onClick = onInvite) { Icon(Icons.Outlined.PeopleOutline, copy("Пригласить", "Invite")) }
         }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(top = 4.dp),
-            contentPadding = PaddingValues(8.dp)
-        ) {
-            items(
-                items = contacts.sortedByDescending { lastMessageTime[it.cid] ?: 0L },
-                key = { it.cid }
-            ) { contact ->
-                ChatItem(
-                    contact = contact,
-                    lastMessage = lastMessage[contact.cid],
-                    timeStr = formatTime(lastMessageTime[contact.cid] ?: 0L),
-                    onClick = { onChatClick(contact.cid) }
+        TopAppBarWithSearch("", copy("Поиск", "Search"), { query = it }, Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp))
+        if (visible.isEmpty()) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                QuietEmptyState(
+                    if (query.isBlank()) Icons.Outlined.ChatBubbleOutline else Icons.Outlined.SearchOff,
+                    if (query.isBlank()) copy("Здесь начнётся разговор", "A conversation starts here") else copy("Ничего не найдено", "No results"),
+                    if (query.isBlank()) copy("Ваши разговоры появятся здесь,\nкогда будет подключён контакт.", "Your conversations appear here\nwhen a contact is connected.") else copy("Попробуйте другое имя", "Try another name")
                 )
+            }
+        } else {
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(visible, key = { it.cid }, contentType = { "chat" }) { contact ->
+                    ChatItem(contact, lastMessage[contact.cid], formatTime(lastMessageTime[contact.cid] ?: 0L, StilleColors.language), { onChatClick(contact.cid) })
+                }
             }
         }
     }
 }
 
 @Composable
-fun ChatItem(
-    contact: Contact,
-    lastMessage: Message?,
-    timeStr: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    GlassSurface(
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp).height(72.dp),
-        cornerRadius = 16.dp
-    ) {
-        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF007AFF))
-                        .border(1.dp, Color(0x33FFFFFF), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = contact.name.take(2).uppercase(),
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+fun ChatItem(contact: Contact, lastMessage: Message?, timeStr: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+            InitialAvatar(contact.name)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(contact.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.width(8.dp))
+                    Text(timeStr, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Column(
-                    modifier = Modifier.weight(1f).padding(start = 12.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(contact.name, color = Color(0xFF121212), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                        Text(timeStr, color = Color(0x80121212), fontSize = 12.sp)
-                    }
-                    Text(
-                        text = lastMessage?.body ?: "Нет сообщений",
-                        color = if (lastMessage?.mine == true) Color(0xFF007AFF) else Color(0x80121212),
-                        fontSize = 13.sp,
-                        maxLines = 1
-                    )
-                }
+                Spacer(Modifier.height(5.dp))
+                Text(lastMessage?.body ?: copy("Пока нет сообщений", "No messages yet"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+        HorizontalDivider(Modifier.padding(start = 90.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
-// ─── Chat screen ───────────────────────────────────────────────────────────
 @Composable
 fun ChatScreen(
     cid: Int,
@@ -217,152 +141,51 @@ fun ChatScreen(
     onSendMessage: (String, List<Entity>) -> Unit,
     onBack: () -> Unit
 ) {
-    val focusManager = LocalFocusManager.current
-    var messageText by rememberSaveable { mutableStateOf(TextFieldValue("")) }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        // Top bar
-        GlassSurface(
-            modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 0.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = null,
-                        tint = Color(0xFF007AFF)
-                    )
+    var draft by rememberSaveable(cid) { mutableStateOf("") }
+    // Cache the bounded, deduplicated render list; typing must not reverse/format history.
+    // Message.equals currently ignores delivery flags: include them in the cache key.
+    val deliveryFlags = messages.map { it.flags }
+    val rows = remember(messages, deliveryFlags) { com.stille.messenger.ui.visibleMessages(messages) }
+    val send = {
+        if (draft.isNotBlank()) {
+            onSendMessage(draft, emptyList())
+            draft = ""
+        }
+    }
+    Column(modifier.fillMaxSize().imePadding()) {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, copy("Назад", "Back"), tint = MaterialTheme.colorScheme.primary) }
+                InitialAvatar(contactName, size = 40.dp)
+                Column(Modifier.weight(1f).padding(start = 12.dp, end = 16.dp)) {
+                    Text(contactName, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (contactOnline) copy("В сети", "Online") else copy("Не в сети", "Offline"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF007AFF)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = contactName.take(2).uppercase(),
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Column(modifier = Modifier.padding(start = 12.dp), horizontalAlignment = Alignment.Start) {
-                    Text(
-                        text = contactName,
-                        color = Color(0xFF121212),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = if (contactOnline) "в сети" else "не в сети",
-                        color = if (contactOnline) Color(0xFF34C759) else Color(0x80121212),
-                        fontSize = 12.sp
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { /* Call */ }) {
-                    Icon(
-                        imageVector = Icons.Default.Call,
-                        contentDescription = null,
-                        tint = Color(0xFF007AFF)
-                    )
-                }
-                ThreeDotMenu(
-                    items = listOf(
-                        MenuItem("Инфо о контакте"),
-                        MenuItem("Закрепить чат"),
-                        MenuItem("Удалить чат"),
-                        MenuItem("Заблокировать")
-                    ),
-                    onItemSelected = { },
-                    modifier = Modifier.size(32.dp)
-                )
             }
         }
-
-        // Messages
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 4.dp),
-            reverseLayout = true,
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
-            items(
-                items = messages.reversed(),
-                key = { it.msgId.joinToString("") { b -> "%02x".format(b) } }
-            ) { message ->
-                MessageRow(message = message)
-            }
+        LazyColumn(Modifier.weight(1f), reverseLayout = true, contentPadding = PaddingValues(vertical = 16.dp)) {
+            items(rows, key = { it.first }, contentType = { "message" }) { (_, message) -> MessageRow(message) }
         }
-
-        // Input bar
-        GlassSurface(
-            modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 0.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { /* attach */ }) {
-                    Icon(
-                        imageVector = Icons.Default.Camera,
-                        contentDescription = null,
-                        tint = Color(0x80121212)
-                    )
-                }
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
                 TextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    placeholder = { Text("Сообщение...", color = Color(0x80121212)) },
+                    value = draft, onValueChange = { draft = it },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(18.dp),
+                    placeholder = { Text(copy("Сообщение", "Message")) },
+                    shape = RoundedCornerShape(24.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0x18FFFFFF),
-                        unfocusedContainerColor = Color(0x18FFFFFF),
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = Color(0xFF121212),
-                        unfocusedTextColor = Color(0xFF121212)
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
                     ),
-                    singleLine = false,
-                    maxLines = 4,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            if (messageText.text.isNotBlank()) {
-                                onSendMessage(messageText.text, emptyList())
-                                messageText = TextFieldValue("")
-                            }
-                            focusManager.clearFocus()
-                        }
-                    )
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { send() })
                 )
-                IconButton(
-                    onClick = {
-                        if (messageText.text.isNotBlank()) {
-                            onSendMessage(messageText.text, emptyList())
-                            messageText = TextFieldValue("")
-                        }
-                        focusManager.clearFocus()
-                    },
-                    enabled = messageText.text.isNotBlank()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = null,
-                        tint = if (messageText.text.isNotBlank()) Color(0xFF007AFF) else Color(0x40121212)
-                    )
+                Spacer(Modifier.width(8.dp))
+                FilledIconButton(onClick = send, enabled = draft.isNotBlank(), modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.ArrowUpward, copy("Отправить", "Send"))
                 }
             }
         }
@@ -371,159 +194,85 @@ fun ChatScreen(
 
 @Composable
 fun MessageRow(message: Message) {
-    ChatBubble(
-        isMine = message.mine,
-        delivered = message.delivered,
-        body = message.body,
-        timestamp = formatTime(message.tsMs)
-    )
+    ChatBubble(message.mine, message.delivered, message.body, timestamp = formatTime(message.tsMs, StilleColors.language), entities = message.entities)
 }
 
-// ─── Profile screen ────────────────────────────────────────────────────────
 @Composable
-fun ProfileScreen(
-    name: String = "",
-    avatarBytes: ByteArray? = null,
-    onSetName: (String) -> Unit,
-    onSetAvatar: () -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.Start
-    ) {
+fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null, onSetName: (String) -> Unit, onSetAvatar: () -> Unit) {
+    var draft by rememberSaveable(name) { mutableStateOf(name) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item { ScreenTitle(copy("Профиль", "Profile")) }
         item {
-            Spacer(Modifier.height(32.dp))
-
-            Box(
-                Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(Color(0xFF007AFF), Color(0xFF0055CC))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(16.dp))
+                if (avatarBytes == null) InitialAvatar(name, size = 96.dp)
+                else AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(avatarBytes).size(288).diskCachePolicy(CachePolicy.DISABLED).memoryCachePolicy(CachePolicy.DISABLED).build(),
+                    contentDescription = copy("Фото профиля", "Profile photo"),
+                    modifier = Modifier.size(96.dp).clip(CircleShape), contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(name, style = MaterialTheme.typography.titleLarge)
+                Text(copy("Так вас видят собеседники", "This is how others see you"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(32.dp))
+                GlassSurface(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp)) {
+                        Text(copy("Имя", "Name"), style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = draft, onValueChange = { draft = ProfileName.limitInput(it) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { if (ProfileName.isValid(draft)) onSetName(draft.trim()) })
                         )
-                    )
-                    .border(2.dp, Color(0x40FFFFFF), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                if (avatarBytes != null) {
-                    Image(
-                        bitmap = BitmapFactory.decodeByteArray(avatarBytes, 0, avatarBytes.size).asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.size(100.dp).clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Text(
-                        text = name.take(2).uppercase(),
-                        color = Color.White,
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { onSetName(draft.trim()) }, enabled = ProfileName.isValid(draft) && draft.trim() != name, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) {
+                            Text(copy("Сохранить", "Save"))
+                        }
+                    }
                 }
             }
-
-            Spacer(Modifier.height(24.dp))
-
-            GlassSurface(modifier = Modifier.fillMaxWidth(), cornerRadius = 20.dp) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Имя", color = Color(0x80121212), fontSize = 12.sp)
-                    TextField(
-                        value = name,
-                        onValueChange = { onSetName(com.stille.messenger.ui.ProfileName.limitInput(it)) },
-                        supportingText = {
-                            Text("${com.stille.messenger.ui.ProfileName.byteLength(name.trim())} / 32 UTF-8")
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color(0x10FFFFFF),
-                            unfocusedContainerColor = Color(0x10FFFFFF),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = Color(0xFF121212),
-                            unfocusedTextColor = Color(0xFF121212)
-                        )
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(80.dp))
         }
     }
 }
 
-// ─── Contacts screen ───────────────────────────────────────────────────────
 @Composable
-fun ContactsScreen(
-    contacts: List<Contact> = emptyList(),
-    onContactClick: (Contact) -> Unit = {}
-) {
+fun ContactsScreen(contacts: List<Contact> = emptyList(), onInvite: () -> Unit = {}, onContactClick: (Contact) -> Unit = {}) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val visible = remember(contacts, query) { com.stille.messenger.ui.filterContacts(contacts, query).sortedBy { it.name.lowercase() } }
     Column(Modifier.fillMaxSize()) {
-        GlassSurface(
-            Modifier.fillMaxWidth(),
-            cornerRadius = 0.dp
-        ) {
-            TopAppBarWithSearch(
-                title = "Контакты",
-                searchHint = "Поиск контактов",
-                onSearchChange = { },
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+        Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            ScreenTitle(copy("Контакты", "Contacts"), Modifier.weight(1f))
+            FilledTonalIconButton(onClick = onInvite) { Icon(Icons.Outlined.PeopleOutline, copy("Пригласить", "Invite")) }
         }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
-            contentPadding = PaddingValues(8.dp)
-        ) {
-            items(contacts, key = { it.cid }) { contact ->
-                ContactItem(contact = contact, onClick = { onContactClick(contact) })
+        GlassSurface(Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp).fillMaxWidth(), cornerRadius = 24.dp) {
+            Row(Modifier.fillMaxWidth().clickable(onClick = onInvite).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.PeopleOutline, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.padding(start = 14.dp)) {
+                    Text(copy("Пригласить в Stille", "Invite to Stille"), style = MaterialTheme.typography.titleMedium)
+                    Text(copy("Ссылка или персональный QR", "Link or personal QR code"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
+        }
+        TopAppBarWithSearch("", copy("Поиск", "Search"), { query = it }, Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp))
+        if (visible.isEmpty()) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                QuietEmptyState(Icons.Outlined.PeopleOutline, if (query.isBlank()) copy("Пока никого нет", "No contacts yet") else copy("Ничего не найдено", "No results"), if (query.isBlank()) copy("Подключённые контакты появятся здесь", "Connected contacts will appear here") else copy("Попробуйте другое имя", "Try another name"))
+            }
+        } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
+            items(visible, key = { it.cid }, contentType = { "contact" }) { ContactItem(it) { onContactClick(it) } }
         }
     }
 }
 
 @Composable
 fun ContactItem(contact: Contact, onClick: () -> Unit) {
-    GlassSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .height(64.dp),
-        cornerRadius = 16.dp
-    ) {
-        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF007AFF)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = contact.name.take(2).uppercase(),
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Text(
-                    text = contact.name,
-                    color = Color(0xFF121212),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    modifier = Modifier.padding(start = 12.dp)
-                )
-            }
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            InitialAvatar(contact.name, size = 46.dp)
+            Text(contact.name, Modifier.weight(1f).padding(start = 14.dp), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        HorizontalDivider(Modifier.padding(start = 84.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }
 }

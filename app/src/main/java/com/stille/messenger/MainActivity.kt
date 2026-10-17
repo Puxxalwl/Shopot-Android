@@ -4,22 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,8 +28,11 @@ import com.stille.coreapi.Contact
 import com.stille.coreapi.Message
 import com.stille.messenger.service.StilleService
 import com.stille.messenger.ui.SetupPreferences
+import com.stille.messenger.ui.rememberStilleService
+import com.stille.messenger.ui.collectStarted
+import com.stille.messenger.ui.screens.InviteSheet
 import com.stille.messenger.ui.components.BottomNavItem
-import com.stille.messenger.ui.components.GlassSurface
+import com.stille.messenger.ui.components.BottomBar
 import com.stille.messenger.ui.screens.ChatScreen
 import com.stille.messenger.ui.screens.ChatsScreen
 import com.stille.messenger.ui.screens.ContactsScreen
@@ -109,55 +107,48 @@ fun StilleApp(
     onThemeModeChange: (String) -> Unit
 ) {
     var currentRoute by rememberSaveable { mutableStateOf("chats") }
-    var contacts by rememberSaveable { mutableStateOf(emptyList<Contact>()) }
+    val coreService = rememberStilleService()
+    val contacts = coreService?.confirmedContacts?.collectStarted()?.value ?: emptyList()
+    val inviteState = coreService?.inviteState?.collectStarted()?.value ?: com.stille.messenger.service.InviteState()
+    var showInvite by rememberSaveable { mutableStateOf(false) }
     var currentChatCid by rememberSaveable { mutableStateOf<Int?>(null) }
     var messages by rememberSaveable { mutableStateOf(emptyList<Message>()) }
     var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
+    androidx.activity.compose.BackHandler(enabled = currentChatCid != null) { currentChatCid = null }
     val darkTheme = com.stille.messenger.ui.theme.StilleColors.isDark
 
+    val isEnglish = language == "en"
     val bottomNavItems = listOf(
-        BottomNavItem("Профиль", Icons.Default.Person, "profile"),
-        BottomNavItem("Чаты", Icons.Default.ChatBubble, "chats"),
-        BottomNavItem("Контакты", Icons.Default.Group, "contacts"),
-        BottomNavItem("Настройки", Icons.Default.Settings, "settings")
+        BottomNavItem(if (isEnglish) "Profile" else "Профиль", Icons.Default.Person, "profile"),
+        BottomNavItem(if (isEnglish) "Chats" else "Чаты", Icons.Default.ChatBubble, "chats"),
+        BottomNavItem(if (isEnglish) "People" else "Контакты", Icons.Default.Group, "contacts"),
+        BottomNavItem(if (isEnglish) "Settings" else "Настройки", Icons.Default.Settings, "settings")
     )
 
+    if (showInvite) InviteSheet(
+        state = inviteState,
+        onCreate = { coreService?.createInvite(name) },
+        onAccept = { coreService?.acceptInvite(it, name) },
+        onClose = { showInvite = false }
+    )
     Box(modifier = Modifier.fillMaxSize()) {
         WallpaperBackground()
         Scaffold(
+            modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
             bottomBar = {
-                GlassSurface(modifier = Modifier.fillMaxWidth().height(64.dp), cornerRadius = 0.dp) {
-                    NavigationBar(containerColor = Color.Transparent) {
-                        bottomNavItems.forEach { item ->
-                            NavigationBarItem(
-                                icon = {
-                                    Icon(
-                                        imageVector = item.icon,
-                                        contentDescription = item.title,
-                                        tint = if (currentRoute == item.route) Color(0xFF007AFF) else Color(0x80FFFFFF)
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = item.title,
-                                        color = if (currentRoute == item.route) Color(0xFF007AFF) else Color(0x80FFFFFF)
-                                    )
-                                },
-                                selected = currentRoute == item.route,
-                                onClick = {
-                                    currentRoute = item.route
-                                    currentChatCid = null
-                                },
-                                colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0x10FFFFFF))
-                            )
-                        }
+                if (currentChatCid == null) BottomBar(
+                    items = bottomNavItems,
+                    currentRoute = currentRoute,
+                    onItemSelected = {
+                        currentRoute = it
+                        currentChatCid = null
                     }
-                }
+                )
             }
         ) { padding ->
-            Box(modifier = Modifier.padding(padding)) {
-                Crossfade(targetState = currentRoute, label = "main-route") { route ->
+            Box(modifier = Modifier.padding(padding).consumeWindowInsets(padding)) {
+                Crossfade(targetState = currentRoute, animationSpec = tween(durationMillis = 180), label = "main-route") { route ->
                     when (route) {
                         "chats" -> {
                             if (currentChatCid != null) {
@@ -177,11 +168,15 @@ fun StilleApp(
                                     onChatClick = { cid -> currentChatCid = cid },
                                     contacts = contacts,
                                     lastMessage = emptyMap(),
-                                    lastMessageTime = emptyMap()
+                                    lastMessageTime = emptyMap(),
+                                    onInvite = { showInvite = true }
                                 )
                             }
                         }
-                        "contacts" -> ContactsScreen(contacts = contacts)
+                        "contacts" -> ContactsScreen(contacts = contacts, onInvite = { showInvite = true }, onContactClick = {
+                            currentChatCid = it.cid
+                            currentRoute = "chats"
+                        })
                         "profile" -> ProfileScreen(
                             name = name,
                             avatarBytes = null,
@@ -190,6 +185,8 @@ fun StilleApp(
                         )
                         "settings" -> SettingsScreen(
                             darkTheme = darkTheme,
+                            themeMode = themeMode,
+                            onThemeModeChange = onThemeModeChange,
                             language = language,
                             notificationsEnabled = notificationsEnabled,
                             onToggleDarkTheme = { onThemeModeChange(if (it) "dark" else "light") },

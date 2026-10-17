@@ -1,221 +1,85 @@
 package com.stille.messenger.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material3.MaterialTheme
+import com.stille.messenger.BuildConfig
 import com.stille.messenger.ui.components.GlassSurface
-import com.stille.messenger.ui.components.TopAppBarWithSearch
-import com.stille.messenger.ui.theme.BlueAccent
+import com.stille.messenger.ui.components.ScreenTitle
+import com.stille.messenger.ui.components.SegmentedChoice
 
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     darkTheme: Boolean = false,
-    language: String = "ru",  // "en" or "ru"
+    language: String = "ru",
     notificationsEnabled: Boolean = true,
     onToggleDarkTheme: (Boolean) -> Unit = {},
     onToggleLanguage: () -> Unit = {},
-    onToggleNotifications: (Boolean) -> Unit = {}
+    onToggleNotifications: (Boolean) -> Unit = {},
+    themeMode: String = if (darkTheme) "dark" else "light",
+    onThemeModeChange: (String) -> Unit = { onToggleDarkTheme(it == "dark") }
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        WallpaperBackground()
-
-        Column(modifier = Modifier.fillMaxSize().padding(bottom = 72.dp)) {
-            GlassSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
-                cornerRadius = 0.dp,
-            ) {
-                TopAppBarWithSearch(
-                    title = "Настройки",
-                    searchHint = "",
-                    onSearchChange = {},
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
-
-            LazyColumnContent(
-                darkTheme = darkTheme,
-                language = language,
-                notificationsEnabled = notificationsEnabled,
-                onToggleDarkTheme = onToggleDarkTheme,
-                onToggleLanguage = onToggleLanguage,
-                onToggleNotifications = onToggleNotifications
-            )
-        }
-    }
-}
-
-@Composable
-private fun LazyColumnContent(
-    darkTheme: Boolean,
-    language: String,
-    notificationsEnabled: Boolean,
-    onToggleDarkTheme: (Boolean) -> Unit,
-    onToggleLanguage: () -> Unit,
-    onToggleNotifications: (Boolean) -> Unit
-) {
-    androidx.compose.foundation.lazy.LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(12.dp),
-        contentPadding = PaddingValues(vertical = 8.dp)
-    ) {
+    val english = language == "en"
+    var about by rememberSaveable { mutableStateOf(false) }
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item { ScreenTitle(if (english) "Settings" else "Настройки") }
         item {
-            GlassSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-                    .height(60.dp),
-                cornerRadius = 16.dp,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { onToggleDarkTheme(!darkTheme) }) {
-                        androidx.compose.material3.Icon(
-                            imageVector = Icons.Default.DarkMode,
-                            contentDescription = null,
-                            tint = BlueAccent
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text("Тёмная тема", color = Color(0xFF121212), fontSize = 15.sp)
-                        Text("Включить тёмную тему", color = Color(0x80121212), fontSize = 12.sp)
-                    }
-                    Switch(
-                        checked = darkTheme,
-                        onCheckedChange = onToggleDarkTheme,
-                        colors = SwitchDefaults.colors(checkedThumbColor = BlueAccent)
+            GlassSurface(Modifier.padding(horizontal = 24.dp).fillMaxWidth()) {
+                Column(Modifier.padding(20.dp)) {
+                    Text(if (english) "Appearance" else "Оформление", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(12.dp))
+                    SegmentedChoice(
+                        if (english) listOf("system" to "Auto", "light" to "Light", "dark" to "Dark") else listOf("system" to "Авто", "light" to "Светлое", "dark" to "Тёмное"),
+                        themeMode, onThemeModeChange
                     )
+                    Spacer(Modifier.height(24.dp))
+                    Text(if (english) "Language" else "Язык", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(12.dp))
+                    SegmentedChoice(listOf("ru" to "Русский", "en" to "English"), language, { if (it != language) onToggleLanguage() })
                 }
             }
         }
-
+        item { Spacer(Modifier.height(24.dp)) }
         item {
-            GlassSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-                    .height(60.dp),
-                cornerRadius = 16.dp,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onToggleLanguage) {
-                        androidx.compose.material3.Icon(
-                            imageVector = Icons.Default.Language,
-                            contentDescription = null,
-                            tint = BlueAccent
-                        )
+            GlassSurface(Modifier.padding(horizontal = 24.dp).fillMaxWidth()) {
+                Column {
+                    Row(
+                        Modifier.fillMaxWidth().toggleable(notificationsEnabled, role = Role.Switch, onValueChange = onToggleNotifications).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.NotificationsNone, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (english) "Notifications" else "Уведомления", Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        Switch(notificationsEnabled, onCheckedChange = null)
                     }
-                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text("Язык интерфейса", color = Color(0xFF121212), fontSize = 15.sp)
-                        Text(
-                            if (language == "ru") "Русский" else "English",
-                            color = Color(0x80121212), fontSize = 12.sp
-                        )
-                    }
-                    Text(
-                        text = if (language == "ru") "РУ" else "EN",
-                        color = BlueAccent,
-                        fontSize = 14.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                }
-            }
-        }
-
-        item {
-            GlassSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-                    .height(60.dp),
-                cornerRadius = 16.dp,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { onToggleNotifications(!notificationsEnabled) }) {
-                        androidx.compose.material3.Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = null,
-                            tint = BlueAccent
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text("Уведомления", color = Color(0xFF121212), fontSize = 15.sp)
-                        Text("Оповещать о новых сообщениях", color = Color(0x80121212), fontSize = 12.sp)
-                    }
-                    Switch(
-                        checked = notificationsEnabled,
-                        onCheckedChange = onToggleNotifications,
-                        colors = SwitchDefaults.colors(checkedThumbColor = BlueAccent)
-                    )
-                }
-            }
-        }
-
-        item {
-            GlassSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-                    .height(60.dp),
-                cornerRadius = 16.dp,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { }) {
-                        androidx.compose.material3.Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = BlueAccent
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text("О программе", color = Color(0xFF121212), fontSize = 15.sp)
-                        Text("Stille Messenger v0.1.0", color = Color(0x80121212), fontSize = 12.sp)
+                    HorizontalDivider(Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        Modifier.fillMaxWidth().clickable { about = true }.heightIn(min = 64.dp).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (english) "About Stille" else "О Stille", Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        Text(BuildConfig.VERSION_NAME, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         }
     }
+    if (about) AlertDialog(
+        onDismissRequest = { about = false },
+        title = { Text("Stille") },
+        text = { Text(if (english) "An open-source messenger client. No analytics or advertising SDKs. Powered by the local shopot-core." else "Открытый клиент мессенджера. Без аналитики и рекламных SDK. Работает с локальным shopot-core.") },
+        confirmButton = { TextButton(onClick = { about = false }) { Text(if (english) "Done" else "Готово") } }
+    )
 }

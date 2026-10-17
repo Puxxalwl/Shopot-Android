@@ -110,6 +110,9 @@ dependencies {
     // Coil (image loading — no Firebase)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Offline QR encoding/decoding only; no network SDK or crypto involvement.
+    implementation("com.google.zxing:core:3.5.3")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
