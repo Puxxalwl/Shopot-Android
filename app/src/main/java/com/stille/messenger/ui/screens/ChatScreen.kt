@@ -2,7 +2,8 @@ package com.stille.messenger.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -135,25 +136,12 @@ fun ChatsScreen(
     }
 }
 
-@androidx.compose.foundation.ExperimentalFoundationApi
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ChatItem(contact: Contact, lastMessage: Message?, timeStr: String, onClick: () -> Unit, modifier: Modifier = Modifier, avatarBytes: ByteArray? = null, pinned: Boolean = false, onAction: (String) -> Unit = {}) {
     var menu by remember(contact.cid) { mutableStateOf(false) }
     var confirmDelete by remember(contact.cid) { mutableStateOf(false) }
-    Column(modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = { menu = true })) {
-        androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            androidx.compose.material3.DropdownMenuItem(text = { Text(if (pinned) copy("Открепить", "Unpin") else copy("Закрепить", "Pin")) }, onClick = { menu = false; onAction(if (pinned) "unpin" else "pin") })
-            androidx.compose.material3.DropdownMenuItem(text = { Text(if (contact.blocked) copy("Разблокировать", "Unblock") else copy("Заблокировать", "Block")) }, onClick = { menu = false; onAction(if (contact.blocked) "unblock" else "block") })
-            androidx.compose.material3.DropdownMenuItem(text = { Text(copy("Удалить чат", "Delete chat"), color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; confirmDelete = true })
-        }
-        if (confirmDelete) AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text(copy("Удалить чат?", "Delete chat?")) },
-            text = { Text(copy("История сообщений этого чата будет удалена.", "This chat's message history will be deleted.")) },
-            confirmButton = { TextButton(onClick = { confirmDelete = false; onAction("delete") }) { Text(copy("Удалить", "Delete"), color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(copy("Отмена", "Cancel")) } }
-        )
+    Box(modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().pointerInput(contact.cid) { detectTapGestures(onTap = { onClick() }, onLongPress = { menu = true }) }) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
             AvatarImage(contact.name, avatarBytes)
             Spacer(Modifier.width(14.dp))
@@ -168,6 +156,22 @@ fun ChatItem(contact: Contact, lastMessage: Message?, timeStr: String, onClick: 
             }
         }
         HorizontalDivider(Modifier.padding(start = 90.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        }
+        Box(Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(40.dp).clickable(onClick = { menu = true }), contentAlignment = Alignment.Center) {
+            Text("⋮", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            androidx.compose.material3.DropdownMenuItem(text = { Text(if (pinned) copy("Открепить", "Unpin") else copy("Закрепить", "Pin")) }, onClick = { menu = false; onAction(if (pinned) "unpin" else "pin") })
+            androidx.compose.material3.DropdownMenuItem(text = { Text(if (contact.blocked) copy("Разблокировать", "Unblock") else copy("Заблокировать", "Block")) }, onClick = { menu = false; onAction(if (contact.blocked) "unblock" else "block") })
+            androidx.compose.material3.DropdownMenuItem(text = { Text(copy("Удалить чат", "Delete chat"), color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; confirmDelete = true })
+        }
+        if (confirmDelete) AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(copy("Удалить чат?", "Delete chat?")) },
+            text = { Text(copy("История сообщений этого чата будет удалена.", "This chat's message history will be deleted.")) },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onAction("delete") }) { Text(copy("Удалить", "Delete"), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(copy("Отмена", "Cancel")) } }
+        )
     }
 }
 
