@@ -18,7 +18,9 @@ stille-messenger-core. The client's job is rendering and transport glue.
    only. No Firebase, no third-party SDKs. Each new dependency needs a
    justification in `CHANGELOG.md` and must not touch crypto.
 3. **No plaintext on disk.** Avatars and files are stored encrypted by the
-   core. Client-side caches are memory-only or encrypted at rest.
+   core. Client-side caches are memory-only or encrypted at rest. The only
+   exception is a verified, temporary public APK downloaded from GitHub Releases
+   into the private cache for user-confirmed installation.
 4. **Binary protocol only.** The UDS interface is the binary framed protocol
    defined in [`data/src/main/java/com/stille/coreapi/StilleProtocol.kt`](data/src/main/java/com/stille/coreapi/StilleProtocol.kt).
    Never add JSON serialization for the protocol layer; keep the frame format

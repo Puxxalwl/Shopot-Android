@@ -36,9 +36,124 @@ object Responses {
         return r.readU32().toInt()  // cid
     }
 
+    fun decodeAcceptInviteEx(payload: ByteArray): AcceptInviteResult {
+        val r = FrameReader(payload)
+        val result = AcceptInviteResult(
+            cid = r.readU32().toInt(),
+            disposition = AcceptDisposition.fromValue(r.readU8()),
+            state = ConnState.fromValue(r.readU8()),
+            attempt = r.readU32()
+        )
+        require(r.remaining == 0) { "trailing accept invite response bytes" }
+        return result
+    }
+
+    fun decodeCreateInviteEx(payload: ByteArray): InviteCode {
+        val r = FrameReader(payload)
+        val result = InviteCode(r.readStr16(), r.readBytes(Limits.INVITE_ID))
+        require(r.remaining == 0) { "trailing create invite response bytes" }
+        return result
+    }
+
+    fun decodeInviteState(payload: ByteArray): InviteStateView {
+        val r = FrameReader(payload)
+        val result = InviteStateView(InviteLifecycleState.fromValue(r.readU8()), r.readU32().toInt(), r.readI64())
+        require(r.remaining == 0) { "trailing invite state response bytes" }
+        return result
+    }
+
+    fun decodeContactState(payload: ByteArray): ConnectionStatus {
+        require(payload.size == 11) { "invalid contact state payload size" }
+        return decodeConnectionStatus(FrameReader(payload))
+    }
+
+    fun decodeBootstrap(payload: ByteArray): ContactsSnapshot {
+        val r = FrameReader(payload)
+        val version = CoreVersion(r.readU16(), r.readU16(), r.readU16())
+        val epoch = r.readBytes(Limits.CONTACT_EPOCH)
+        val revision = r.readU64()
+        val count = boundedCount(r.readU32(), 10_000)
+        val contacts = buildList<ContactView>(count) { repeat(count) { add(decodeContactView(r)) } }
+        require(r.remaining == 0) { "trailing bootstrap bytes" }
+        return ContactsSnapshot(version, epoch, revision, contacts)
+    }
+
+    fun decodeContactsDelta(payload: ByteArray): ContactsDelta {
+        val r = FrameReader(payload)
+        val epoch = r.readBytes(Limits.CONTACT_EPOCH)
+        val revision = r.readU64()
+        val count = boundedCount(r.readU32(), 10_000)
+        val changes = buildList<ContactDeltaEntry>(count) {
+            repeat(count) {
+                val itemRevision = r.readU64()
+                val change = when (r.readU8()) {
+                    0 -> DeltaChange.UPSERT
+                    1 -> DeltaChange.REMOVED
+                    else -> throw ProtocolException("unknown contact delta kind")
+                }
+                val cid = r.readU32().toInt()
+                val contact = if (change == DeltaChange.UPSERT) decodeContactView(r, cid) else null
+                add(ContactDeltaEntry(itemRevision, change, cid, contact))
+            }
+        }
+        require(r.remaining == 0) { "trailing contacts delta bytes" }
+        return ContactsDelta(epoch, revision, changes)
+    }
+
+    fun decodeReachableEndpoints(payload: ByteArray): List<String> {
+        val r = FrameReader(payload)
+        val count = r.readU8()
+        require(count <= Limits.REACHABLE_ENDPOINTS_MAX) { "too many endpoints" }
+        val endpoints = List(count) { r.readStr16().also { value ->
+            require(value.encodeToByteArray().size <= Limits.INVITE_ADDR_MAX) { "endpoint too long" }
+        } }
+        require(r.remaining == 0) { "trailing endpoints bytes" }
+        return endpoints
+    }
+
+    private fun decodeContactView(r: FrameReader, expectedCid: Int? = null): ContactView {
+        val cid = r.readU32().toInt()
+        if (expectedCid != null) require(cid == expectedCid) { "contact delta id mismatch" }
+        val flags = r.readU8()
+        val lastSeen = r.readI64()
+        val name = r.readStr16()
+        val avatarId = r.readBytes(16)
+        val connection = decodeConnectionStatus(r)
+        return ContactView(cid, flags and 1 != 0, flags and 2 != 0, flags and 4 != 0, lastSeen, name, avatarId, connection)
+    }
+
+    private fun decodeConnectionStatus(r: FrameReader): ConnectionStatus = ConnectionStatus(
+        ConnState.fromValue(r.readU8()), r.readU32(), ConnErr.fromValue(r.readU16()), r.readU32()
+    )
+
+    private fun boundedCount(value: Long, maximum: Int): Int {
+        if (value > maximum) throw ProtocolException("response count exceeds limit")
+        return value.toInt()
+    }
+
+    fun decodeHistoryPage(payload: ByteArray, cid: Int): HistoryPage {
+        val r = FrameReader(payload)
+        val hasMore = r.readU8() != 0
+        val nextTs = r.readU64()
+        val nextId = r.readBytes(16)
+        val count = boundedCount(r.readU32(), Limits.HISTORY_PAGE_MAX)
+        val messages = buildList<Message>(count) {
+            repeat(count) {
+                val flags = r.readByte()
+                val msgId = r.readBytes(16)
+                val ts = r.readU64()
+                val body = r.readStr16()
+                add(Message(cid, msgId, flags, ts, body, decodeEntityTail(r)))
+            }
+        }
+        require(r.remaining == 0) { "trailing history page bytes" }
+        val cursor = if (hasMore && count > 0) HistoryCursor(nextTs, nextId) else null
+        return HistoryPage(hasMore, cursor, messages)
+    }
+
     fun decodeListContacts(payload: ByteArray): List<Contact> {
         val r = FrameReader(payload)
-        val count = r.readU32().toInt()
+        val count = boundedCount(r.readU32(), 10_000)
         return buildList {
             repeat(count) {
                 val cid = r.readU32().toInt()

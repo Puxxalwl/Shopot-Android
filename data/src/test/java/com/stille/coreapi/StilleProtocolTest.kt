@@ -88,6 +88,13 @@ class StilleProtocolTest {
         assertEquals(40, Method.GET_MY_AVATAR.id)
         assertEquals(41, Method.CREATE_RECOVERY_BACKUP.id)
         assertEquals(42, Method.RESTORE_RECOVERY_BACKUP.id)
+        assertEquals(43, Method.GET_CONTACT_STATE.id)
+        assertEquals(44, Method.ACCEPT_INVITE_EX.id)
+        assertEquals(46, Method.GET_BOOTSTRAP.id)
+        assertEquals(49, Method.CREATE_INVITE_EX.id)
+        assertEquals(51, Method.GET_HISTORY_PAGE.id)
+        assertEquals(17, Event.CONTACT_UPSERTED.id)
+        assertEquals(21, status.RESYNC_REQUIRED)
         assertEquals("OK", status.name(0))
         assertEquals("BAD_FRAME", status.name(1))
         assertEquals("BAD_ARGS", status.name(3))
@@ -198,6 +205,46 @@ class StilleProtocolTest {
         assertEquals(5, cfg.flags)
         assertEquals("relay.example.com:7777", cfg.serverAddr)
         assertEquals("", cfg.torAddr)
+    }
+
+    @Test
+    fun `api 2.7 invitation and bootstrap payloads decode`() {
+        val inviteId = ByteArray(16) { 4 }
+        val invitePayload = FrameBuffer().apply { writeStr16("shopot://i3/test"); writeBytes(inviteId) }.toByteArray()
+        val invite = Responses.decodeCreateInviteEx(invitePayload)
+        assertEquals("shopot://i3/test", invite.code)
+        assertBytes(inviteId, invite.inviteId)
+
+        val acceptPayload = FrameBuffer().apply { writeU32(9); writeU8(0); writeU8(2); writeU32(3) }.toByteArray()
+        val accepted = Responses.decodeAcceptInviteEx(acceptPayload)
+        assertEquals(9, accepted.cid)
+        assertEquals(AcceptDisposition.ACCEPTED, accepted.disposition)
+        assertEquals(ConnState.DIALING, accepted.state)
+
+        val epoch = ByteArray(16) { 7 }
+        val bootstrap = FrameBuffer().apply {
+            writeU16(2); writeU16(7); writeU16(0); writeBytes(epoch); writeU64(1); writeU32(1)
+            writeU32(9); writeU8(4); writeI64(0); writeStr16("pending")
+            writeBytes(ByteArray(16)); writeU8(0); writeU32(1); writeU16(0); writeU32(500)
+        }.toByteArray()
+        val snapshot = Responses.decodeBootstrap(bootstrap)
+        assertEquals(1, snapshot.contacts.size)
+        assertTrue(snapshot.contacts.single().pending)
+        assertEquals(ConnState.PENDING, snapshot.contacts.single().connection.state)
+
+        assertFailsWith<ProtocolException> { Responses.decodeCreateInviteEx(invitePayload + byteArrayOf(1)) }
+        assertFailsWith<ProtocolException> {
+            Responses.decodeAcceptInviteEx(FrameBuffer().apply { writeU32(1); writeU8(8); writeU8(0); writeU32(0) }.toByteArray())
+        }
+    }
+
+    @Test
+    fun `api 2.7 request encoders use exact layouts`() {
+        val request = Requests.createInviteEx(InviteExMode.DIRECT, "A", "10.0.0.1:7777")
+        val r = FrameReader(request)
+        assertEquals(1, r.readU8()); assertEquals("A", r.readStr16()); assertEquals("10.0.0.1:7777", r.readStr16()); assertEquals("", r.readStr16())
+        val history = Requests.getHistoryPage(4, HistoryCursor(99, ByteArray(16) { 2 }), 30)
+        assertEquals(4, FrameReader(history).readU32().toInt())
     }
 
     @Test

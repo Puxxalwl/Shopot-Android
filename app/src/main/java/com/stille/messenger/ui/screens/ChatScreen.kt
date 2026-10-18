@@ -275,9 +275,14 @@ fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null,
 }
 
 @Composable
-fun ContactsScreen(contacts: List<Contact> = emptyList(), avatarBytes: Map<Int, ByteArray> = emptyMap(), onInvite: () -> Unit = {}, onContactClick: (Contact) -> Unit = {}) {
+fun ContactsScreen(contacts: List<Contact> = emptyList(), contactViews: List<com.stille.coreapi.ContactView> = emptyList(), avatarBytes: Map<Int, ByteArray> = emptyMap(), onInvite: () -> Unit = {}, onContactClick: (Contact) -> Unit = {}) {
     var query by rememberSaveable { mutableStateOf("") }
-    val visible = remember(contacts, query) { com.stille.messenger.ui.filterContacts(contacts, query).sortedBy { it.name.lowercase() } }
+    val visible = remember(contacts, contactViews, query) {
+        val pending = contactViews.filter { it.pending && contacts.none { contact -> contact.cid == it.cid } }.map {
+            Contact(it.cid, it.online, it.blocked, it.lastSeenMs, copy("Новый контакт", "New contact"), it.avatarId)
+        }
+        com.stille.messenger.ui.filterContacts(contacts + pending, query).sortedBy { it.name.lowercase() }
+    }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             ScreenTitle(copy("Контакты", "Contacts"), Modifier.weight(1f))
@@ -298,17 +303,30 @@ fun ContactsScreen(contacts: List<Contact> = emptyList(), avatarBytes: Map<Int, 
                 QuietEmptyState(Icons.Outlined.PeopleOutline, if (query.isBlank()) copy("Пока никого нет", "No contacts yet") else copy("Ничего не найдено", "No results"), if (query.isBlank()) copy("Подключённые контакты появятся здесь", "Connected contacts will appear here") else copy("Попробуйте другое имя", "Try another name"))
             }
         } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-            items(visible, key = { it.cid }, contentType = { "contact" }) { ContactItem(it, avatarBytes[it.cid]) { onContactClick(it) } }
+            items(visible, key = { it.cid }, contentType = { "contact" }) { contact ->
+                val view = contactViews.firstOrNull { it.cid == contact.cid }
+                ContactItem(contact, avatarBytes[contact.cid], view?.connection?.state, enabled = view?.pending != true) { onContactClick(contact) }
+            }
         }
     }
 }
 
 @Composable
-fun ContactItem(contact: Contact, avatarBytes: ByteArray? = null, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+fun ContactItem(contact: Contact, avatarBytes: ByteArray? = null, connectionState: com.stille.coreapi.ConnState? = null, enabled: Boolean = true, onClick: () -> Unit) {
+    val status = when (connectionState) {
+        com.stille.coreapi.ConnState.PENDING, com.stille.coreapi.ConnState.DISCOVERING -> copy("Ожидает подключения", "Waiting to connect")
+        com.stille.coreapi.ConnState.DIALING, com.stille.coreapi.ConnState.HANDSHAKING, com.stille.coreapi.ConnState.JOINING -> copy("Подключение…", "Connecting…")
+        com.stille.coreapi.ConnState.FAILED -> copy("Ошибка подключения; повторим автоматически", "Connection issue; retrying automatically")
+        com.stille.coreapi.ConnState.OFFLINE -> copy("Не в сети", "Offline")
+        else -> null
+    }
+    Column(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)) {
         Row(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            AvatarImage(contact.name, avatarBytes, size = 46.dp)
-            Text(contact.name, Modifier.weight(1f).padding(start = 14.dp), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            AvatarImage(contact.name, if (enabled) avatarBytes else null, size = 46.dp)
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text(contact.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
         }
         HorizontalDivider(Modifier.padding(start = 84.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }

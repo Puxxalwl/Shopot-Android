@@ -34,7 +34,6 @@ fun WelcomeScreen(
     var name by rememberSaveable { mutableStateOf(initialName) }
     var language by rememberSaveable { mutableStateOf(initialLanguage) }
     var theme by rememberSaveable { mutableStateOf(initialThemeMode) }
-    var about by rememberSaveable { mutableStateOf(false) }
     val english = language == "en"
     val scope = rememberCoroutineScope()
     Box(Modifier.fillMaxSize()) {
@@ -97,16 +96,7 @@ fun WelcomeScreen(
                 shape = RoundedCornerShape(16.dp)
             ) { Text(if (english) "Continue" else "Продолжить", style = MaterialTheme.typography.labelLarge) }
             TextButton(onClick = onRestore) { Text(if (english) "Restore account" else "Восстановить аккаунт", color = MaterialTheme.colorScheme.primary) }
-            TextButton(onClick = { about = true }) { Text(if (english) "Why Stille?" else "Почему Stille?", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
     }
-    if (about) AlertDialog(
-        onDismissRequest = { about = false },
-        title = { Text(if (english) "Why Stille?" else "Почему Stille?") },
-        text = { Text(if (english)
-            "An open-source messenger without ads or tracking. Messages are encrypted. Keep your phone protected and the app up to date."
-        else "Мессенджер с открытым кодом, без рекламы и слежки. Сообщения зашифрованы. Защищайте телефон и обновляйте приложение.") },
-        confirmButton = { TextButton(onClick = { about = false }) { Text(if (english) "Got it" else "Понятно") } }
-    )
 }

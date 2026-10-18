@@ -2,6 +2,27 @@ package com.stille.coreapi
 
 // ─── Data Models ──────────────────────────────────────────────────────────
 
+data class ConnectionStatus(val state: ConnState, val attempt: Long, val lastError: ConnErr, val nextRetryMs: Long)
+
+data class ContactView(
+    val cid: Int, val online: Boolean, val blocked: Boolean, val pending: Boolean,
+    val lastSeenMs: Long, val name: String, val avatarId: ByteArray,
+    val connection: ConnectionStatus
+) {
+    fun asContact(): Contact = Contact(cid, online, blocked, lastSeenMs, name, avatarId)
+}
+
+data class ContactsSnapshot(val apiVersion: CoreVersion, val epoch: ByteArray, val revision: Long, val contacts: List<ContactView>)
+data class ContactDeltaEntry(val revision: Long, val change: DeltaChange, val cid: Int, val contact: ContactView?)
+data class ContactsDelta(val epoch: ByteArray, val revision: Long, val entries: List<ContactDeltaEntry>)
+data class InviteCode(val code: String, val inviteId: ByteArray)
+data class InviteStateView(val state: InviteLifecycleState, val acceptedCid: Int, val expiresAtMs: Long)
+data class AcceptInviteResult(val cid: Int, val disposition: AcceptDisposition, val state: ConnState, val attempt: Long)
+data class HistoryCursor(val beforeTsMs: Long, val beforeMsgId: ByteArray) {
+    init { require(beforeMsgId.size == 16) { "cursor message id must be 16 bytes" } }
+}
+data class HistoryPage(val hasMore: Boolean, val nextCursor: HistoryCursor?, val messages: List<Message>)
+
 /** A contact in the contact list (CORE-API §4.2 LIST_CONTACTS). */
 data class Contact(
     val cid: Int,          // u32

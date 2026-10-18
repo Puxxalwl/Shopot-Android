@@ -3,7 +3,17 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0]
+
+### Added
+- Added optional once-per-launch GitHub Releases checks, an update badge and an update sheet, plus verified in-app APK downloads that hand off to Android's install confirmation. Users can disable automatic checks while retaining manual checks in About Stille.
+- Updated the core submodule to API 2.7.0. Friend invitations now use the
+  one-key `ACCEPT_INVITE_EX` flow; authenticated JOIN completion, rather than
+  a second code or manual confirmation, establishes the contact.
+- Contact synchronization uses `SUBSCRIBE_CONTACT_UPDATES`, `GET_BOOTSTRAP`,
+  revision deltas, and contact update events to avoid repeated full-list
+  requests. Extended invite creation uses reachable LAN endpoints when safe.
+
 
 ## [0.2.6]
 

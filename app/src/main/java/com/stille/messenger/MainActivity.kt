@@ -2,6 +2,9 @@ package com.stille.messenger
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.MaterialTheme
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -57,8 +60,14 @@ import com.stille.messenger.ui.screens.SettingsScreen
 import com.stille.messenger.ui.screens.WallpaperBackground
 import com.stille.messenger.ui.screens.WelcomeScreen
 import com.stille.messenger.ui.theme.StilleTheme
+import com.stille.messenger.update.UpdateController
+import com.stille.messenger.update.UpdateResult
+import com.stille.messenger.update.DownloadState
+import com.stille.messenger.update.installUpdate
 
 class MainActivity : ComponentActivity() {
+    private val updates: UpdateController by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val setupPreferences = SetupPreferences(this)
@@ -71,6 +80,10 @@ class MainActivity : ComponentActivity() {
             var name by rememberSaveable { mutableStateOf(preferences.name) }
             var language by rememberSaveable { mutableStateOf(preferences.language) }
             var themeMode by rememberSaveable { mutableStateOf(preferences.themeMode) }
+            var checkUpdatesOnLaunch by rememberSaveable { mutableStateOf(preferences.checkUpdatesOnLaunch) }
+            val updateState = updates.state.collectAsState().value
+            androidx.compose.runtime.LaunchedEffect(Unit) { updates.launchCheck(checkUpdatesOnLaunch) }
+            androidx.compose.runtime.LaunchedEffect(checkUpdatesOnLaunch) { updates.setAutoEnabled(checkUpdatesOnLaunch) }
             var showRestore by rememberSaveable { mutableStateOf(false) }
 
             val recoveryScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -93,6 +106,7 @@ class MainActivity : ComponentActivity() {
                             language = selectedLanguage
                             themeMode = selectedTheme
                             setupCompleted = true
+                            updates.markAutoCheckDeferred()
                             StilleService.start(this@MainActivity)
                         }
                     )
@@ -116,6 +130,7 @@ class MainActivity : ComponentActivity() {
                                 name = restoredName
                                 showRestore = false
                                 setupCompleted = true
+                                updates.markAutoCheckDeferred()
                             },
                             onDismiss = {
                                 showRestore = false
@@ -132,6 +147,12 @@ class MainActivity : ComponentActivity() {
                         language = language,
                         themeMode = themeMode,
                         recovery = recovery,
+                        updateState = updateState,
+                        checkUpdatesOnLaunch = checkUpdatesOnLaunch,
+                        onToggleAutoUpdates = { enabled -> checkUpdatesOnLaunch = enabled; preferences.updateCheckUpdatesOnLaunch(enabled); updates.setAutoEnabled(enabled) },
+                        onManualUpdateCheck = { updates.check(manual = true) },
+                        onStartUpdateDownload = { host -> updates.startDownload(host) },
+                        onCancelUpdateDownload = { updates.cancelDownload() },
                         onNameChange = {
                             name = it
                             preferences.updateName(it)
@@ -158,20 +179,31 @@ fun StilleApp(
     language: String,
     themeMode: String,
     recovery: RecoveryController? = null,
+    updateState: com.stille.messenger.update.UpdateUiState = com.stille.messenger.update.UpdateUiState(),
+    checkUpdatesOnLaunch: Boolean = true,
+    onToggleAutoUpdates: (Boolean) -> Unit = {},
+    onManualUpdateCheck: () -> Unit = {},
+    onStartUpdateDownload: (android.app.Activity) -> Unit = {},
+    onCancelUpdateDownload: () -> Unit = {},
     onNameChange: (String) -> Unit,
     onLanguageChange: (String) -> Unit,
     onThemeModeChange: (String) -> Unit
 ) {
     val coreService = rememberStilleService()
     val contacts = coreService?.confirmedContacts?.collectStarted()?.value ?: emptyList()
+    val contactViews = coreService?.contactViews?.collectStarted()?.value ?: emptyList()
     val avatarMap = coreService?.avatars?.collectStarted()?.value ?: emptyMap()
     val inviteState = coreService?.inviteState?.collectStarted()?.value ?: com.stille.messenger.service.InviteState()
+    var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
     var showInvite by rememberSaveable { mutableStateOf(false) }
     val avatarState = coreService?.avatarState?.collectStarted()?.value ?: com.stille.messenger.service.AvatarState()
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) coreService?.setAvatar(uri)
     }
     var currentChatCid by rememberSaveable { mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.LaunchedEffect(updateState.showSheet, showInvite, currentChatCid, showUpdateSheet) {
+        if (updateState.showSheet && !showInvite && currentChatCid == null && !showUpdateSheet) showUpdateSheet = true
+    }
     var messages by rememberSaveable { mutableStateOf(emptyList<Message>()) }
     var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
     androidx.activity.compose.BackHandler(enabled = currentChatCid != null) { currentChatCid = null }
@@ -185,6 +217,14 @@ fun StilleApp(
         BottomNavItem(if (isEnglish) "Settings" else "Настройки", Icons.Default.Settings, "settings")
     )
 
+    if (showUpdateSheet) {
+        val release = (updateState.result as? UpdateResult.Available)?.release
+        if (release != null) com.stille.messenger.ui.screens.UpdateSheet(
+            release = release, english = isEnglish,
+            onUpdate = { showUpdateSheet = false; val host = activity; if (host != null) updates.startDownload(host) },
+            onLater = { showUpdateSheet = false; updates.dismissSheet() }
+        )
+    }
     if (showInvite) InviteSheet(
         state = inviteState,
         onCreate = { coreService?.createInvite(name) },
@@ -221,7 +261,7 @@ fun StilleApp(
                     onInvite = { showInvite = true }
                 )
                 "contacts" -> ContactsScreen(
-                    contacts = contacts, avatarBytes = avatarMap,
+                    contacts = contacts, contactViews = contactViews, avatarBytes = avatarMap,
                     onInvite = { showInvite = true }, onContactClick = { currentChatCid = it.cid }
                 )
                 "profile" -> ProfileScreen(
@@ -236,6 +276,24 @@ fun StilleApp(
                     onToggleDarkTheme = { onThemeModeChange(if (it) "dark" else "light") },
                     onToggleLanguage = { onLanguageChange(if (language == "ru") "en" else "ru") },
                     onToggleNotifications = { notificationsEnabled = it },
+                    checkUpdatesOnLaunch = checkUpdatesOnLaunch,
+                    onCheckUpdatesOnLaunch = onToggleAutoUpdates,
+                    updateResult = updateState.result,
+                    updateChecking = updateState.checking,
+                    downloadState = updateState.download,
+                    onCheckUpdates = onManualUpdateCheck,
+                    onAboutOpened = onManualUpdateCheck,
+                    hasUpdate = updateState.result is com.stille.messenger.update.UpdateResult.Available && checkUpdatesOnLaunch,
+                    onUpdateDownload = {
+                        val host = activity
+                        if (host != null) {
+                            if (updateState.download is DownloadState.Ready) {
+                                try { host.startActivity(installUpdate(host, (updateState.download as DownloadState.Ready).file)) }
+                                catch (_: Exception) { }
+                            } else onStartUpdateDownload(host)
+                        }
+                    },
+                    onCancelDownload = onCancelUpdateDownload,
                     recoverySection = recovery?.let { controller ->
                         activity?.let { host ->
                             {

@@ -56,6 +56,55 @@ object Requests {
     /** LIST_CONTACTS (6): ∅. */
     fun listContacts(): ByteArray = byteArrayOf()
 
+    /** GET_CONTACT_STATE (43): [cid u32]. */
+    fun getContactState(cid: Int): ByteArray = encodeU32Payload(cid)
+
+    /** ACCEPT_INVITE_EX (44): [code str16][my_name str16]. */
+    fun acceptInviteEx(code: String, myName: String): ByteArray = acceptInvite(code, myName)
+
+    /** ACCEPT_INVITE_EX convenience overload with response-oriented naming. */
+    fun acceptFriendRequest(code: String, myName: String): ByteArray = acceptInviteEx(code, myName)
+
+    /** SUBSCRIBE_CONTACT_UPDATES (45): ∅. */
+    fun subscribeContactUpdates(): ByteArray = byteArrayOf()
+
+    /** GET_BOOTSTRAP (46): ∅. */
+    fun getBootstrap(): ByteArray = byteArrayOf()
+
+    /** GET_CONTACTS_DELTA (47): [epoch 16][from_revision u64]. */
+    fun getContactsDelta(epoch: ByteArray, fromRevision: Long): ByteArray {
+        require(epoch.size == Limits.CONTACT_EPOCH) { "epoch must be 16 bytes" }
+        require(fromRevision >= 0) { "revision must not be negative" }
+        return FrameBuffer().apply { writeBytes(epoch); writeU64(fromRevision) }.toByteArray()
+    }
+
+    /** GET_REACHABLE_ENDPOINTS (48): ∅. */
+    fun getReachableEndpoints(): ByteArray = byteArrayOf()
+
+    /** CREATE_INVITE_EX (49): [mode u8][name str16][direct str16][relay str16]. */
+    fun createInviteEx(mode: InviteExMode, name: String, direct: String = "", relay: String = ""): ByteArray {
+        require(name.encodeToByteArray().size <= Limits.INVITE_NAME_MAX) { "invite name too long (>32 bytes)" }
+        require(direct.encodeToByteArray().size <= Limits.INVITE_ADDR_MAX) { "direct address too long (>64 bytes)" }
+        require(relay.encodeToByteArray().size <= Limits.INVITE_ADDR_MAX) { "relay address too long (>64 bytes)" }
+        return FrameBuffer().apply { writeU8(mode.value); writeStr16(name); writeStr16(direct); writeStr16(relay) }.toByteArray()
+    }
+
+    /** GET_INVITE_STATE (50): [invite_id 16]. */
+    fun getInviteState(inviteId: ByteArray): ByteArray {
+        require(inviteId.size == Limits.INVITE_ID) { "invite id must be 16 bytes" }
+        return inviteId.copyOf()
+    }
+
+    /** GET_HISTORY_PAGE (51): cursor-based history request. */
+    fun getHistoryPage(cid: Int, cursor: HistoryCursor? = null, limit: Int = 0): ByteArray {
+        require(limit in 0..Limits.HISTORY_PAGE_MAX) { "limit exceeds ${Limits.HISTORY_PAGE_MAX}" }
+        return FrameBuffer().apply {
+            writeU32(cid.toLong()); writeU8(if (cursor == null) 0 else 1)
+            writeU64(cursor?.beforeTsMs ?: 0L); writeBytes(cursor?.beforeMsgId ?: ByteArray(16))
+            writeU16(limit)
+        }.toByteArray()
+    }
+
     // ── 4.3 Messages ────────────────────────────────────────────────────
 
     /** SEND_MESSAGE (7): [cid u32][body str16 ≤4096][entity tail]. */

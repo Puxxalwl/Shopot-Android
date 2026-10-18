@@ -131,7 +131,13 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
                     }
                 }
                 Spacer(Modifier.height(14.dp))
-                Text(if (english) "Use once, before the app restarts. Try the same Wi-Fi network if you cannot connect. Share only with the person you want to add." else "На один раз, до перезапуска приложения. Если не получается подключиться, используйте одну сеть Wi-Fi. Отправляйте только тому, кого хотите добавить.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val lifecycleText = when (state.lifecycle) {
+                    com.stille.coreapi.InviteLifecycleState.ACTIVE -> if (english) "Waiting for the invitation to be accepted. One key is enough; no second code is needed." else "Ожидаем принятия приглашения. Достаточно одного кода — второй не нужен."
+                    com.stille.coreapi.InviteLifecycleState.JOINING -> if (english) "The other device is joining…" else "Второе устройство подключается…"
+                    com.stille.coreapi.InviteLifecycleState.CONSUMED -> if (english) "Friend request accepted and connection confirmed." else "Заявка принята, подключение подтверждено."
+                    else -> if (english) "Use once, before the app restarts. Share only with the person you want to add." else "Одноразовый код действует до перезапуска ядра. Отправляйте только тому, кого хотите добавить."
+                }
+                Text(lifecycleText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Button(onClick = { liveScanning = true }, enabled = !scanning, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                     Text(if (english) "Scan with camera" else "Сканировать камерой")
@@ -147,7 +153,15 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
                 Button(onClick = { onAccept(input); input = "" }, enabled = input.isNotBlank() && state.ready && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoundedCornerShape(18.dp)) {
                     Text(if (english) "Connect" else "Подключиться")
                 }
-                if (state.accepted) Text(if (english) "Invitation accepted. Waiting for the other person…" else "Приглашение принято. Ждём собеседника…", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium)
+                if (state.accepted) {
+                    val status = when (state.connection?.state) {
+                        com.stille.coreapi.ConnState.DISCOVERING, com.stille.coreapi.ConnState.PENDING -> if (english) "Request accepted. Looking for the other device…" else "Заявка принята. Ищем второе устройство…"
+                        com.stille.coreapi.ConnState.DIALING, com.stille.coreapi.ConnState.HANDSHAKING, com.stille.coreapi.ConnState.JOINING -> if (english) "Connecting securely…" else "Безопасное подключение…"
+                        com.stille.coreapi.ConnState.FAILED -> if (english) "Connection failed; the core will retry automatically." else "Не удалось подключиться; ядро попробует снова."
+                        else -> if (english) "Request accepted. Waiting for authenticated connection…" else "Заявка принята. Ожидаем подтверждённого подключения…"
+                    }
+                    Text(status, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium)
+                }
             }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 16.dp))
             if (state.joined) Text(if (english) "Connection confirmed" else "Подключение подтверждено", Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.primary)
@@ -156,6 +170,11 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
                     InviteError.CORE_UNAVAILABLE -> if (english) "Connection unavailable. Try again." else "Подключение недоступно. Повторите попытку."
                     InviteError.INVALID_CODE -> if (english) "Invalid invitation. Ask for a new one." else "Приглашение недействительно. Попросите новое."
                     InviteError.LIMIT_REACHED -> if (english) "Four invitations are already active. Use an existing one." else "Уже созданы четыре приглашения. Используйте существующее."
+                    InviteError.RESYNC_REQUIRED -> if (english) "Contact data changed. Refreshing the list…" else "Список контактов изменился. Обновляем…"
+                    InviteError.DISCOVERY_DISABLED -> if (english) "Local network discovery is disabled." else "Обнаружение устройств в локальной сети отключено."
+                    InviteError.TRANSPORT_FAILED -> if (english) "The connection could not be established yet." else "Пока не удалось установить подключение."
+                    InviteError.RELAY_UNAVAILABLE -> if (english) "The relay is unavailable." else "Ретранслятор недоступен."
+                    InviteError.TOR_UNAVAILABLE -> if (english) "The Tor proxy is unavailable." else "Прокси Tor недоступен."
                     InviteError.REQUEST_FAILED -> if (english) "Could not complete the request. Try again." else "Не удалось выполнить запрос. Попробуйте ещё раз."
                 }
                 Text(text, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)

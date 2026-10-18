@@ -137,6 +137,40 @@ object Events {
      * CONFIG_CHANGED (14, API 2.6.0) payload — the new config blob
      * (§4.9: `[ver u8][flags u32][server_addr str16][tor_addr str16]`).
      */
+    fun decodeContactStateChanged(payload: ByteArray): ContactStateChangedEvent {
+        val r = FrameReader(payload)
+        val event = ContactStateChangedEvent(r.readBytes(Limits.CONTACT_EPOCH), r.readU64(), r.readU32().toInt(), decodeConnection(r))
+        require(r.remaining == 0) { "trailing contact state event bytes" }
+        return event
+    }
+
+    fun decodeContactsChanged(payload: ByteArray): ContactsChangedEvent {
+        val r = FrameReader(payload)
+        val event = ContactsChangedEvent(r.readBytes(Limits.CONTACT_EPOCH), r.readU64())
+        require(r.remaining == 0) { "trailing contacts changed event bytes" }
+        return event
+    }
+
+    fun decodeContactUpserted(payload: ByteArray): ContactUpsertedEvent {
+        val r = FrameReader(payload)
+        val epoch = r.readBytes(Limits.CONTACT_EPOCH)
+        val revision = r.readU64()
+        val cid = r.readU32().toInt()
+        val viewCid = r.readU32().toInt()
+        require(viewCid == cid) { "contact upsert id mismatch" }
+        val flags = r.readU8()
+        val lastSeen = r.readI64()
+        val name = r.readStr16()
+        val avatarId = r.readBytes(16)
+        val connection = decodeConnection(r)
+        require(r.remaining == 0) { "trailing contact upsert event bytes" }
+        return ContactUpsertedEvent(epoch, revision, ContactView(cid, flags and 1 != 0, flags and 2 != 0, flags and 4 != 0, lastSeen, name, avatarId, connection))
+    }
+
+    private fun decodeConnection(r: FrameReader): ConnectionStatus = ConnectionStatus(
+        ConnState.fromValue(r.readU8()), r.readU32(), ConnErr.fromValue(r.readU16()), r.readU32()
+    )
+
     fun decodeConfigChanged(payload: ByteArray): ConfigBlob {
         val r = FrameReader(payload)
         val ver = r.readU8()
@@ -154,6 +188,10 @@ object Events {
         /** REPLY_RECEIVED only: the quoted message id (16 bytes); null otherwise. */
         val replyTo: ByteArray? = null
     )
+
+    data class ContactStateChangedEvent(val epoch: ByteArray, val revision: Long, val cid: Int, val connection: ConnectionStatus)
+    data class ContactsChangedEvent(val epoch: ByteArray, val revision: Long)
+    data class ContactUpsertedEvent(val epoch: ByteArray, val revision: Long, val contact: ContactView)
 
     data class ConfigBlob(
         val ver: Int,

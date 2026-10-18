@@ -1,12 +1,16 @@
 package com.stille.messenger.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.SystemUpdate
+import com.stille.messenger.update.DownloadState
+import com.stille.messenger.update.UpdateResult
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,7 +34,17 @@ fun SettingsScreen(
     onToggleNotifications: (Boolean) -> Unit = {},
     themeMode: String = if (darkTheme) "dark" else "light",
     onThemeModeChange: (String) -> Unit = { onToggleDarkTheme(it == "dark") },
-    recoverySection: (@Composable () -> Unit)? = null
+    recoverySection: (@Composable () -> Unit)? = null,
+    checkUpdatesOnLaunch: Boolean = true,
+    onCheckUpdatesOnLaunch: (Boolean) -> Unit = {},
+    updateResult: UpdateResult? = null,
+    updateChecking: Boolean = false,
+    downloadState: DownloadState = DownloadState.Idle,
+    onCheckUpdates: () -> Unit = {},
+    onUpdateDownload: () -> Unit = {},
+    onCancelDownload: () -> Unit = {},
+    onAboutOpened: () -> Unit = {},
+    hasUpdate: Boolean = updateResult is UpdateResult.Available
 ) {
     val english = language == "en"
     var about by rememberSaveable { mutableStateOf(false) }
@@ -68,11 +82,21 @@ fun SettingsScreen(
                     }
                     HorizontalDivider(Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                     Row(
-                        Modifier.fillMaxWidth().clickable { about = true }.heightIn(min = 64.dp).padding(16.dp),
+                        Modifier.fillMaxWidth().toggleable(checkUpdatesOnLaunch, role = Role.Switch, onValueChange = onCheckUpdatesOnLaunch).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.SystemUpdate, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (english) "Check updates on launch" else "Проверять обновления при запуске", Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        Switch(checkUpdatesOnLaunch, onCheckedChange = null)
+                    }
+                    HorizontalDivider(Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        Modifier.fillMaxWidth().clickable { about = true; onAboutOpened() }.heightIn(min = 64.dp).padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(if (english) "About Stille" else "О Stille", Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        if (hasUpdate) Box(Modifier.padding(end = 6.dp).width(8.dp).height(8.dp), contentAlignment = Alignment.Center) { Canvas(Modifier.fillMaxSize()) { drawCircle(MaterialTheme.colorScheme.primary) } }
                         Text(BuildConfig.VERSION_NAME, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -82,7 +106,28 @@ fun SettingsScreen(
     if (about) AlertDialog(
         onDismissRequest = { about = false },
         title = { Text("Stille") },
-        text = { Text(if (english) "An open-source messenger. No ads or tracking." else "Мессенджер с открытым кодом. Без рекламы и слежки.") },
+        text = {
+            Column {
+                Text(if (english) "An open-source messenger. No ads or tracking." else "Мессенджер с открытым кодом. Без рекламы и слежки.")
+                Spacer(Modifier.height(16.dp))
+                when {
+                    updateChecking -> Text(if (english) "Checking for updates…" else "Проверяем обновления…")
+                    updateResult is UpdateResult.Current -> Text(if (english) "The latest version of Stille is installed" else "Установлена последняя версия Stille")
+                    updateResult is UpdateResult.Available -> Text(if (english) "A new Stille update is available: ${updateResult.release.version}" else "Доступно новое обновление Stille: ${updateResult.release.version}")
+                    updateResult is UpdateResult.Error -> Text(if (english) "Update check failed: ${updateResult.message}" else "Не удалось проверить обновление: ${updateResult.message}", color = MaterialTheme.colorScheme.error)
+                }
+                if (downloadState is DownloadState.Running) {
+                    val progress = downloadState.received.toFloat() / (downloadState.total ?: 1L).toFloat()
+                    LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, Modifier.fillMaxWidth())
+                    TextButton(onClick = onCancelDownload) { Text(if (english) "Cancel" else "Отменить") }
+                } else if (downloadState is DownloadState.Ready) {
+                    Text(if (english) "Download complete. Tap Update again to install." else "Загрузка завершена. Нажмите «Обновить» ещё раз для установки.")
+                } else if (updateResult is UpdateResult.Available) {
+                    Button(onClick = onUpdateDownload) { Text(if (english) "Update" else "Обновить") }
+                }
+                if (!updateChecking && updateResult is UpdateResult.Error) TextButton(onClick = onCheckUpdates) { Text(if (english) "Retry" else "Повторить") }
+            }
+        },
         confirmButton = { TextButton(onClick = { about = false }) { Text(if (english) "Done" else "Готово") } }
     )
 }

@@ -1,11 +1,11 @@
 package com.stille.coreapi
 
 /**
- * Binary UDS interface codec for shopot-core (API 2.2.0).
+ * Binary UDS interface codec for stille-messenger core (API 2.7.0).
  *
  * Implements the 16-byte LE frame header and all typed payload encoders/decoders
  * for request methods, responses, and events as defined in:
- * https://github.com/Puxxalwl/shopot-core — zig/docs/CORE-API.md
+ * core-src/core/docs/CORE-API.md
  *
  * Wire contract:
  * - magic: u16 LE = 0x5A50 ("ZP")
@@ -79,7 +79,17 @@ enum class Method(val id: Int) {
     GET_MY_AVATAR(40),
     // 2.6.0 — account recovery without history
     CREATE_RECOVERY_BACKUP(41),
-    RESTORE_RECOVERY_BACKUP(42);
+    RESTORE_RECOVERY_BACKUP(42),
+    // 2.7.0 — optimized GUI contact/invite observation
+    GET_CONTACT_STATE(43),
+    ACCEPT_INVITE_EX(44),
+    SUBSCRIBE_CONTACT_UPDATES(45),
+    GET_BOOTSTRAP(46),
+    GET_CONTACTS_DELTA(47),
+    GET_REACHABLE_ENDPOINTS(48),
+    CREATE_INVITE_EX(49),
+    GET_INVITE_STATE(50),
+    GET_HISTORY_PAGE(51);
 
     companion object {
         fun fromId(id: Int) = entries.firstOrNull { it.id == id }
@@ -102,7 +112,10 @@ enum class Event(val id: Int) {
     FILE_SENT(11),
     CONTACT_CARD(12),
     REPLY_RECEIVED(13),
-    CONFIG_CHANGED(14);
+    CONFIG_CHANGED(14),
+    CONTACT_STATE_CHANGED(15),
+    CONTACTS_CHANGED(16),
+    CONTACT_UPSERTED(17);
 
     companion object {
         fun fromId(id: Int) = entries.firstOrNull { it.id == id }
@@ -133,6 +146,7 @@ object status {
     const val BAD_RECOVERY = 18
     const val NOT_INITIALIZED = 19
     const val ALREADY_PROVISIONED = 20
+    const val RESYNC_REQUIRED = 21
     const val INTERNAL = 255
 
     fun name(code: Int): String = when (code) {
@@ -157,6 +171,7 @@ object status {
         BAD_RECOVERY -> "BAD_RECOVERY"
         NOT_INITIALIZED -> "NOT_INITIALIZED"
         ALREADY_PROVISIONED -> "ALREADY_PROVISIONED"
+        RESYNC_REQUIRED -> "RESYNC_REQUIRED"
         INTERNAL -> "INTERNAL"
         else -> "UNKNOWN($code)"
     }
@@ -191,11 +206,44 @@ object Limits {
     // 2.6.0 — recovery package (§4.10 / §6)
     const val RECOVERY_SECRET = 32
     const val RECOVERY_BLOB = 92786
+    const val HISTORY_PAGE_MAX = 200
+    const val HISTORY_PAGE_DEFAULT = 30
+    const val INVITE_ID = 16
+    const val CONTACT_EPOCH = 16
+    const val REACHABLE_ENDPOINTS_MAX = 255
 }
 
 // ── Exceptions ────────────────────────────────────────────────────────────
 class ProtocolException(message: String) : Exception(message)
 class ProtocolStatusException(val code: Int, message: String) : Exception(message)
+
+enum class ConnState(val value: Int) {
+    PENDING(0), DISCOVERING(1), DIALING(2), HANDSHAKING(3), JOINING(4), ONLINE(5), OFFLINE(6), FAILED(7);
+    companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown connection state") }
+}
+
+enum class ConnErr(val value: Int) {
+    NONE(0), DISCOVERY_DISABLED(1), TRANSPORT_UNAVAILABLE(2), TRANSPORT_TIMEOUT(3), AUTH_FAILED(4),
+    JOIN_TIMEOUT(5), CAPACITY_EXHAUSTED(6), RELAY_UNREACHABLE(7), TOR_UNAVAILABLE(8), CANCELED(9);
+    companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown connection error") }
+}
+
+enum class AcceptDisposition(val value: Int) {
+    ACCEPTED(0), ALREADY_PENDING(1), ALREADY_CONNECTED(2);
+    companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown invite disposition") }
+}
+
+enum class InviteExMode(val value: Int) {
+    DISCOVERY(0), DIRECT(1), RELAY_ONLY(2), DIRECT_THEN_RELAY(3);
+    companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown invite mode") }
+}
+
+enum class InviteLifecycleState(val value: Int) {
+    ACTIVE(0), JOINING(1), CONSUMED(2), EXPIRED(3), FAILED(4);
+    companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown invite state") }
+}
+
+enum class DeltaChange(val value: Int) { UPSERT(0), REMOVED(1) }
 
 // ── Frame I/O helpers (Little-Endian, allocation-conscious ByteArray) ──────
 /**
@@ -415,6 +463,7 @@ fun encodeEntityTail(entities: List<Entity>): ByteArray {
 
 fun decodeEntityTail(r: FrameReader): List<Entity> {
     val count = r.readU8()
+    require(count <= Limits.ENTITY_MAX) { "too many entities" }
     val out = mutableListOf<Entity>()
     repeat(count) {
         val kind = r.readU8()

@@ -43,7 +43,10 @@ Market asset set.
 On the first launch, Stille Messenger opens a local welcome setup where you choose the
 interface language, light/system/dark theme, and the name shown on your profile.
 These choices are stored locally on the device and can be changed later in the
-app settings/profile.
+app settings/profile. Stille can check the public GitHub Releases feed once per
+launch; this can be disabled in Settings while manual checks remain available in
+About Stille. Updates are downloaded only after confirmation and are verified
+before Android's system installer opens.
 
 
 Stille means “silence” in German. Names are limited to 1–32 UTF-8 bytes, matching
@@ -117,7 +120,7 @@ bash ./tools/build-core.sh
 
 ### Release signing and installation
 
-Release builds (current version `0.2.5`, versionCode `25`) require a persistent private keystore via `STILLE_KEYSTORE_PATH`,
+Release builds (current version `0.3.0`, versionCode `27`) require a persistent private keystore via `STILLE_KEYSTORE_PATH`,
 `STILLE_STORE_PASSWORD`, `STILLE_KEY_ALIAS`, and `STILLE_KEY_PASSWORD`. Debug
 builds remain independent. Never commit a keystore or paste its contents into logs.
 

@@ -18,6 +18,9 @@ class SetupPreferences(context: Context) {
     val themeMode: String
         get() = preferences.getString(KEY_THEME_MODE, DEFAULT_THEME_MODE) ?: DEFAULT_THEME_MODE
 
+    val checkUpdatesOnLaunch: Boolean
+        get() = preferences.getBoolean(KEY_CHECK_UPDATES, true)
+
     fun save(name: String, language: String, themeMode: String) {
         require(ProfileName.isValid(name)) { "Name must contain 1..32 UTF-8 bytes" }
         preferences.edit()
@@ -41,12 +44,17 @@ class SetupPreferences(context: Context) {
         preferences.edit().putString(KEY_LANGUAGE, language).apply()
     }
 
+    fun updateCheckUpdatesOnLaunch(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_CHECK_UPDATES, enabled).apply()
+    }
+
     private companion object {
         const val FILE_NAME = "stille_prefs"
         const val KEY_COMPLETED = "onboarding_complete"
         const val KEY_NAME = "profile_name"
         const val KEY_LANGUAGE = "language"
         const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_CHECK_UPDATES = "check_updates_on_launch"
         const val DEFAULT_LANGUAGE = "ru"
         const val DEFAULT_THEME_MODE = "system"
     }

@@ -22,8 +22,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // Increase for published releases to support ordered updates and avoid downgrades.
-        versionCode = 26
-        versionName = "0.2.6"
+        versionCode = 27
+        versionName = "0.3.0"
 
         // WebAuthn RP id for the account-recovery passkey. Must be a domain this
         // app claims via assetlinks before store distribution.

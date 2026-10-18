@@ -23,6 +23,13 @@ import com.stille.coreapi.encodeFrame
 import com.stille.coreapi.decodeFrame
 import com.stille.coreapi.CoreVersion
 import com.stille.coreapi.ProtocolStatusException
+import com.stille.coreapi.ConnErr
+import com.stille.coreapi.ConnState
+import com.stille.coreapi.ConnectionStatus
+import com.stille.coreapi.DeltaChange
+import com.stille.coreapi.InviteExMode
+import com.stille.coreapi.InviteLifecycleState
+import com.stille.coreapi.status
 import com.stille.messenger.R
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -57,6 +64,12 @@ class StilleService : Service() {
     private var startJob: Job? = null
     private val _confirmedContacts = MutableStateFlow<List<com.stille.coreapi.Contact>>(emptyList())
     val confirmedContacts = _confirmedContacts.asStateFlow()
+    private val _contactViews = MutableStateFlow<List<com.stille.coreapi.ContactView>>(emptyList())
+    val contactViews = _contactViews.asStateFlow()
+    private var contactEpoch: ByteArray? = null
+    private var contactRevision: Long = 0L
+    private var apiVersion = CoreVersion(0, 0, 0)
+    private val contactsSyncMutex = Mutex()
     // ACCEPT_INVITE creates a local pending contact before the remote JOIN is authenticated.
     private val pendingContactIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
     private val onlineContactIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
@@ -197,21 +210,25 @@ class StilleService : Service() {
         serviceScope.launch {
             if (!inviteMutex.tryLock()) return@launch
             try {
-                if (!_isCoreReady.value) {
-                    _inviteState.value = _inviteState.value.copy(error = InviteError.CORE_UNAVAILABLE)
-                    return@launch
-                }
-                // Reuse the live code instead of exhausting the four-invite core registry.
+                if (!_isCoreReady.value) { _inviteState.update { it.copy(error = InviteError.CORE_UNAVAILABLE) }; return@launch }
                 if (_inviteState.value.code != null) return@launch
-                _inviteState.value = _inviteState.value.copy(busy = true, error = null, joined = false)
-                val response = sendRequest(Method.CREATE_INVITE, Requests.createInvite(name, ""))
-                val code = Responses.decodeCreateInvite(response.second)
-                _inviteState.value = _inviteState.value.copy(code = code, busy = false)
-            } catch (e: TimeoutCancellationException) {
-                _inviteState.update { it.copy(busy = false, error = InviteError.REQUEST_FAILED) }
+                _inviteState.update { it.copy(busy = true, error = null, joined = false, code = null, inviteId = null, lifecycle = null, acceptedCid = null, connection = null) }
+                if (apiVersion.minor < 7) {
+                    val response = sendRequest(Method.CREATE_INVITE, Requests.createInvite(name, ""))
+                    _inviteState.update { it.copy(code = Responses.decodeCreateInvite(response.second), busy = false) }
+                } else {
+                    val endpoints = runCatching {
+                        Responses.decodeReachableEndpoints(sendRequest(Method.GET_REACHABLE_ENDPOINTS, Requests.getReachableEndpoints()).second)
+                    }.getOrDefault(emptyList())
+                    val direct = endpoints.firstOrNull().orEmpty()
+                    val mode = if (direct.isEmpty()) InviteExMode.DISCOVERY else InviteExMode.DIRECT
+                    val response = sendRequest(Method.CREATE_INVITE_EX, Requests.createInviteEx(mode, name, direct = direct))
+                    val invite = Responses.decodeCreateInviteEx(response.second)
+                    _inviteState.update { it.copy(code = invite.code, inviteId = invite.inviteId, lifecycle = InviteLifecycleState.ACTIVE, busy = false) }
+                }
+            } catch (e: TimeoutCancellationException) { _inviteState.update { it.copy(busy = false, error = InviteError.REQUEST_FAILED) }
             } catch (e: CancellationException) { throw e
-            } catch (e: Exception) {
-                _inviteState.value = _inviteState.value.copy(busy = false, error = inviteError(e))
+            } catch (e: Exception) { _inviteState.update { it.copy(busy = false, error = inviteError(e)) }
             } finally { inviteMutex.unlock() }
         }
     }
@@ -220,25 +237,24 @@ class StilleService : Service() {
         serviceScope.launch {
             if (!inviteMutex.tryLock()) return@launch
             try {
-                if (!_isCoreReady.value) {
-                    _inviteState.value = _inviteState.value.copy(error = InviteError.CORE_UNAVAILABLE)
-                    return@launch
+                if (!_isCoreReady.value) { _inviteState.update { it.copy(error = InviteError.CORE_UNAVAILABLE) }; return@launch }
+                val normalized = code.trim()
+                if (!validInviteInput(normalized)) { _inviteState.update { it.copy(error = InviteError.INVALID_CODE) }; return@launch }
+                _inviteState.update { it.copy(busy = true, error = null, accepted = false, joined = false, lifecycle = null, connection = null) }
+                if (apiVersion.minor < 7) {
+                    val response = sendRequest(Method.ACCEPT_INVITE, Requests.acceptInvite(normalized, name))
+                    val cid = Responses.decodeAcceptInvite(response.second)
+                    pendingContactIds.add(cid)
+                    _inviteState.update { it.copy(busy = false, accepted = true, acceptedCid = cid) }
+                } else {
+                    val response = sendRequest(Method.ACCEPT_INVITE_EX, Requests.acceptInviteEx(normalized, name))
+                    val accepted = Responses.decodeAcceptInviteEx(response.second)
+                    pendingContactIds.add(accepted.cid)
+                    _inviteState.update { it.copy(busy = false, accepted = true, acceptedCid = accepted.cid, connection = ConnectionStatus(accepted.state, accepted.attempt, ConnErr.NONE, 0L)) }
                 }
-                if (!validInviteInput(code.trim())) {
-                    _inviteState.value = _inviteState.value.copy(error = InviteError.INVALID_CODE)
-                    return@launch
-                }
-                _inviteState.value = _inviteState.value.copy(busy = true, error = null, accepted = false, joined = false)
-                val response = sendRequest(Method.ACCEPT_INVITE, Requests.acceptInvite(code.trim(), name))
-                val cid = Responses.decodeAcceptInvite(response.second)
-                // A cid alone is not authenticated identity: keep it pending until JOIN/PRESENCE.
-                pendingContactIds.add(cid)
-                _inviteState.value = _inviteState.value.copy(busy = false, accepted = true)
-            } catch (e: TimeoutCancellationException) {
-                _inviteState.update { it.copy(busy = false, error = InviteError.REQUEST_FAILED) }
+            } catch (e: TimeoutCancellationException) { _inviteState.update { it.copy(busy = false, error = InviteError.REQUEST_FAILED) }
             } catch (e: CancellationException) { throw e
-            } catch (e: Exception) {
-                _inviteState.value = _inviteState.value.copy(busy = false, error = inviteError(e))
+            } catch (e: Exception) { _inviteState.update { it.copy(busy = false, error = inviteError(e)) }
             } finally { inviteMutex.unlock() }
         }
     }
@@ -246,16 +262,56 @@ class StilleService : Service() {
     private fun requestContactSnapshot() {
         serviceScope.launch {
             try {
-                val response = sendRequest(Method.LIST_CONTACTS, Requests.listContacts())
-                val contacts = Responses.decodeListContacts(response.second)
-                _confirmedContacts.value = contacts.filter { it.cid > 0 }.takeLast(200)
-            } catch (_: Exception) { /* next core event or retry will refresh */ }
+                if (apiVersion.minor >= 7) {
+                    refreshContactBootstrap()
+                } else {
+                    val response = sendRequest(Method.LIST_CONTACTS, Requests.listContacts())
+                    val contacts = Responses.decodeListContacts(response.second)
+                    _confirmedContacts.value = contacts.filter { it.cid > 0 }.takeLast(200)
+                }
+            } catch (_: Exception) { /* reconnect or a later event will retry */ }
         }
     }
 
+    private suspend fun refreshContactBootstrap() = contactsSyncMutex.withLock { refreshContactBootstrapLocked() }
+
+    private suspend fun refreshContactBootstrapLocked() {
+        val response = sendRequest(Method.GET_BOOTSTRAP, Requests.getBootstrap())
+        val snapshot = Responses.decodeBootstrap(response.second)
+        contactEpoch = snapshot.epoch
+        contactRevision = snapshot.revision
+        _contactViews.value = snapshot.contacts.takeLast(200)
+        _confirmedContacts.value = snapshot.contacts.filter { !it.pending && !pendingContactIds.contains(it.cid) }.map { it.asContact() }.takeLast(200)
+        pendingContactIds.removeIf { cid -> snapshot.contacts.none { it.cid == cid && it.pending } }
+    }
+
+    private suspend fun applyContactsDelta(epoch: ByteArray, revision: Long) = contactsSyncMutex.withLock {
+        val currentEpoch = contactEpoch
+        if (currentEpoch == null || !currentEpoch.contentEquals(epoch)) return@withLock refreshContactBootstrapLocked()
+        if (revision <= contactRevision) return@withLock
+        val response = try { sendRequest(Method.GET_CONTACTS_DELTA, Requests.getContactsDelta(currentEpoch, contactRevision)) }
+        catch (e: ProtocolStatusException) {
+            if (e.code == status.RESYNC_REQUIRED) return@withLock refreshContactBootstrapLocked()
+            throw e
+        }
+        val delta = Responses.decodeContactsDelta(response.second)
+        if (!currentEpoch.contentEquals(delta.epoch) || delta.revision < contactRevision) return@withLock refreshContactBootstrapLocked()
+        val byCid = _contactViews.value.associateBy { it.cid }.toMutableMap()
+        delta.entries.forEach { entry -> if (entry.change == DeltaChange.REMOVED) byCid.remove(entry.cid) else entry.contact?.let { byCid[entry.cid] = it } }
+        contactEpoch = delta.epoch
+        contactRevision = delta.revision
+        _contactViews.value = byCid.values.takeLast(200)
+        _confirmedContacts.value = byCid.values.filter { !it.pending }.map { it.asContact() }.takeLast(200)
+        pendingContactIds.removeIf { cid -> byCid[cid]?.pending != true }
+    }
+
     private fun inviteError(error: Exception): InviteError = when ((error as? ProtocolStatusException)?.code) {
-        com.stille.coreapi.status.BAD_INVITE_CODE -> InviteError.INVALID_CODE
-        com.stille.coreapi.status.TOO_MANY_INVITES -> InviteError.LIMIT_REACHED
+        status.BAD_INVITE_CODE -> InviteError.INVALID_CODE
+        status.TOO_MANY_INVITES -> InviteError.LIMIT_REACHED
+        status.RESYNC_REQUIRED -> InviteError.RESYNC_REQUIRED
+        status.NO_RELAY -> InviteError.RELAY_UNAVAILABLE
+        status.TOR_UNAVAILABLE -> InviteError.TOR_UNAVAILABLE
+        status.TRANSPORT_FAILED -> InviteError.TRANSPORT_FAILED
         else -> InviteError.REQUEST_FAILED
     }
 
@@ -490,14 +546,18 @@ class StilleService : Service() {
             // Ready probe: GET_VERSION
             val versionResp = sendRequest(Method.GET_VERSION, Requests.getVersion())
             val version = Responses.decodeGetVersion(versionResp.second)
-            if (version.major != 2) {
-                throw ProtocolException("incompatible core version: ${version.major}.${version.minor}.${version.patch}")
-            }
+            if (version.major != 2) throw ProtocolException("incompatible core major version")
+            apiVersion = version
             android.util.Log.i("StilleService", "Core version: ${version.major}.${version.minor}.${version.patch}")
 
-            // Bootstrap: LIST_CONTACTS
-            val contactsResp = sendRequest(Method.LIST_CONTACTS, Requests.listContacts())
-            val contacts = Responses.decodeListContacts(contactsResp.second)
+            val contacts = if (version.minor >= 7) {
+                sendRequest(Method.SUBSCRIBE_CONTACT_UPDATES, Requests.subscribeContactUpdates())
+                refreshContactBootstrap()
+                _confirmedContacts.value
+            } else {
+                val contactsResp = sendRequest(Method.LIST_CONTACTS, Requests.listContacts())
+                Responses.decodeListContacts(contactsResp.second).also { _confirmedContacts.value = it.filter { c -> c.cid > 0 }.takeLast(200) }
+            }
 
             // Unprovisioned probe: GET_IDENTITY refuses with NOT_INITIALIZED when
             // the daemon waits for RESTORE_RECOVERY_BACKUP (§4.10).
@@ -577,10 +637,7 @@ class StilleService : Service() {
                     // accepted contact only after the core has completed the JOIN handshake.
                     if (ev.online && pendingContactIds.remove(ev.cid)) {
                         _inviteState.update { it.copy(accepted = false, joined = true) }
-                        val current = _confirmedContacts.value.firstOrNull { it.cid == ev.cid }
-                        if (current == null) {
-                            requestContactSnapshot()
-                        }
+                        if (apiVersion.minor < 7 && _confirmedContacts.value.none { it.cid == ev.cid }) requestContactSnapshot()
                     }
                     _confirmedContacts.update { list ->
                         list.map { if (it.cid == ev.cid) it.copy(online = ev.online, lastSeenMs = ev.lastSeen) else it }
@@ -595,10 +652,19 @@ class StilleService : Service() {
                     val ev = com.stille.coreapi.Events.decodeContactJoined(payload)
                     pendingContactIds.remove(ev.cid)
                     onlineContactIds.add(ev.cid)
-                    _confirmedContacts.value = (_confirmedContacts.value.filterNot { it.cid == ev.cid } +
-                        com.stille.coreapi.Contact(ev.cid, true, false, 0L, ev.name)).takeLast(200)
-                    _inviteState.value = _inviteState.value.copy(code = null, accepted = false, joined = true)
+                    if (apiVersion.minor < 7) {
+                        _confirmedContacts.value = (_confirmedContacts.value.filterNot { it.cid == ev.cid } +
+                            com.stille.coreapi.Contact(ev.cid, true, false, 0L, ev.name)).takeLast(200)
+                    }
+                    _inviteState.update { it.copy(code = null, accepted = false, joined = true, lifecycle = InviteLifecycleState.CONSUMED, connection = ConnectionStatus(ConnState.ONLINE, it.connection?.attempt ?: 0L, ConnErr.NONE, 0L)) }
                     _events.emit(com.stille.messenger.service.CoreEvent.ContactJoined(ev.cid, ev.name))
+                    val inviteId = _inviteState.value.inviteId
+                    if (apiVersion.minor >= 7 && inviteId != null) serviceScope.launch {
+                        runCatching {
+                            val state = Responses.decodeInviteState(sendRequest(Method.GET_INVITE_STATE, Requests.getInviteState(inviteId)).second)
+                            _inviteState.update { it.copy(lifecycle = state.state, acceptedCid = state.acceptedCid.takeIf { cid -> cid > 0 }) }
+                        }
+                    }
                 }
                 12 -> { // CONTACT_CARD
                     val card = com.stille.coreapi.Events.decodeContactCard(payload)
@@ -608,8 +674,38 @@ class StilleService : Service() {
                     val ev = com.stille.coreapi.Events.decodeReplyReceived(payload)
                     _events.emit(com.stille.messenger.service.CoreEvent.MessageReceived(ev.message, ev.senderName))
                 }
-                14 -> { // CONFIG_CHANGED (API 2.6.0): no config-dependent client state yet
+                14 -> { // CONFIG_CHANGED
                     com.stille.coreapi.Events.decodeConfigChanged(payload)
+                }
+                15 -> {
+                    val ev = com.stille.coreapi.Events.decodeContactStateChanged(payload)
+                    if (apiVersion.minor >= 7 && contactEpoch?.contentEquals(ev.epoch) == true && ev.revision > contactRevision) {
+                        serviceScope.launch { runCatching { applyContactsDelta(ev.epoch, ev.revision) } }
+                        _inviteState.update {
+                            if (it.acceptedCid == ev.cid) {
+                                val joined = ev.connection.state == ConnState.ONLINE
+                                if (joined) pendingContactIds.remove(ev.cid)
+                                it.copy(connection = ev.connection, joined = joined, accepted = if (joined) false else it.accepted)
+                            } else it
+                        }
+                    }
+                }
+                16 -> {
+                    val ev = com.stille.coreapi.Events.decodeContactsChanged(payload)
+                    if (apiVersion.minor >= 7) serviceScope.launch { runCatching { applyContactsDelta(ev.epoch, ev.revision) } }
+                }
+                17 -> {
+                    val ev = com.stille.coreapi.Events.decodeContactUpserted(payload)
+                    if (apiVersion.minor >= 7 && contactEpoch?.contentEquals(ev.epoch) == true && ev.revision > contactRevision) {
+                        serviceScope.launch {
+                            runCatching { applyContactsDelta(ev.epoch, ev.revision) }
+                            val contact = _contactViews.value.firstOrNull { it.cid == ev.contact.cid }
+                            if (contact != null && !contact.pending) {
+                                pendingContactIds.remove(contact.cid)
+                                _inviteState.update { state -> if (state.acceptedCid == contact.cid) state.copy(connection = contact.connection, joined = true, accepted = false) else state }
+                            }
+                        }
+                    }
                 }
                 6 -> {  // AVATAR_RECEIVED
                     val avatar = com.stille.coreapi.Events.decodeAvatarReceived(payload)
@@ -744,6 +840,9 @@ class StilleService : Service() {
         _isCoreReady.value = false
         _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
         _confirmedContacts.value = emptyList()
+        _contactViews.value = emptyList()
+        contactEpoch = null
+        contactRevision = 0L
         pendingContactIds.clear()
         onlineContactIds.clear()
         _avatars.value = emptyMap()
