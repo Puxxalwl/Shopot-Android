@@ -104,11 +104,12 @@ jobs:
         echo "${RUNNER_TEMP}/zig-${zig_arch}-linux-0.17.0" >> "${GITHUB_PATH}"
         "${RUNNER_TEMP}/zig-${zig_arch}-linux-0.17.0/zig" version
 
-    - name: Verify shopot-core compiles
+    - name: Verify stille-messenger-core compiles
       run: |
-        cd core-src/zig
+        test -f core-src/core/build.zig
+        cd core-src/core
         zig build -Doptimize=ReleaseFast
 
     - name: Verify CORE-API version
       run: |
-        grep "API version:" core-src/zig/docs/CORE-API.md
+        grep "API version:" core-src/core/docs/CORE-API.md

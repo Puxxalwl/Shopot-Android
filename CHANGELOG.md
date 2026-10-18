@@ -3,7 +3,7 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.3.0]
+## [3.0.1]
 
 ### Added
 - Added optional once-per-launch GitHub Releases checks, an update badge and an update sheet, plus verified in-app APK downloads that hand off to Android's install confirmation. Users can disable automatic checks while retaining manual checks in About Stille.
