@@ -2,6 +2,7 @@ package com.stille.messenger.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -102,10 +103,13 @@ fun ChatsScreen(
     lastMessage: Map<Int, Message?> = emptyMap(),
     lastMessageTime: Map<Int, Long> = emptyMap(),
     avatarBytes: Map<Int, ByteArray> = emptyMap(),
+    pinnedCid: Int? = null,
+    onChatAction: (Int, String) -> Unit = { _, _ -> },
     onInvite: () -> Unit = {}
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val sorted = remember(contacts, lastMessageTime) { contacts.sortedByDescending { lastMessageTime[it.cid] ?: 0L } }
+    val chatsWithHistory = remember(contacts, lastMessage) { contacts.filter { lastMessage[it.cid] != null } }
+    val sorted = remember(chatsWithHistory, lastMessageTime) { chatsWithHistory.sortedByDescending { lastMessageTime[it.cid] ?: 0L } }
     val visible = remember(sorted, query) { com.stille.messenger.ui.filterContacts(sorted, query) }
     Column(modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -124,16 +128,32 @@ fun ChatsScreen(
         } else {
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
                 items(visible, key = { it.cid }, contentType = { "chat" }) { contact ->
-                    ChatItem(contact, lastMessage[contact.cid], formatTime(lastMessageTime[contact.cid] ?: 0L, StilleColors.language), { onChatClick(contact.cid) }, avatarBytes = avatarBytes[contact.cid])
+                    ChatItem(contact, lastMessage[contact.cid], formatTime(lastMessageTime[contact.cid] ?: 0L, StilleColors.language), { onChatClick(contact.cid) }, avatarBytes = avatarBytes[contact.cid], pinned = pinnedCid == contact.cid, onAction = { action -> onChatAction(contact.cid, action) })
                 }
             }
         }
     }
 }
 
+@androidx.compose.foundation.ExperimentalFoundationApi
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun ChatItem(contact: Contact, lastMessage: Message?, timeStr: String, onClick: () -> Unit, modifier: Modifier = Modifier, avatarBytes: ByteArray? = null) {
-    Column(modifier.fillMaxWidth().clickable(onClick = onClick)) {
+fun ChatItem(contact: Contact, lastMessage: Message?, timeStr: String, onClick: () -> Unit, modifier: Modifier = Modifier, avatarBytes: ByteArray? = null, pinned: Boolean = false, onAction: (String) -> Unit = {}) {
+    var menu by remember(contact.cid) { mutableStateOf(false) }
+    var confirmDelete by remember(contact.cid) { mutableStateOf(false) }
+    Column(modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = { menu = true })) {
+        androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            androidx.compose.material3.DropdownMenuItem(text = { Text(if (pinned) copy("Открепить", "Unpin") else copy("Закрепить", "Pin")) }, onClick = { menu = false; onAction(if (pinned) "unpin" else "pin") })
+            androidx.compose.material3.DropdownMenuItem(text = { Text(if (contact.blocked) copy("Разблокировать", "Unblock") else copy("Заблокировать", "Block")) }, onClick = { menu = false; onAction(if (contact.blocked) "unblock" else "block") })
+            androidx.compose.material3.DropdownMenuItem(text = { Text(copy("Удалить чат", "Delete chat"), color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; confirmDelete = true })
+        }
+        if (confirmDelete) AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(copy("Удалить чат?", "Delete chat?")) },
+            text = { Text(copy("История сообщений этого чата будет удалена.", "This chat's message history will be deleted.")) },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onAction("delete") }) { Text(copy("Удалить", "Delete"), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(copy("Отмена", "Cancel")) } }
+        )
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
             AvatarImage(contact.name, avatarBytes)
             Spacer(Modifier.width(14.dp))
@@ -159,7 +179,7 @@ fun ChatScreen(
     messages: List<Message>,
     avatarBytes: ByteArray? = null,
     modifier: Modifier = Modifier,
-    onSendMessage: (String, List<Entity>) -> Unit,
+    onSendMessage: (String, List<Entity>, (Boolean) -> Unit) -> Unit,
     onBack: () -> Unit
 ) {
     var draft by rememberSaveable(cid) { mutableStateOf("") }
@@ -168,9 +188,9 @@ fun ChatScreen(
     val deliveryFlags = messages.map { it.flags }
     val rows = remember(messages, deliveryFlags) { com.stille.messenger.ui.visibleMessages(messages) }
     val send = {
-        if (draft.isNotBlank()) {
-            onSendMessage(draft, emptyList())
-            draft = ""
+        val text = draft.trim()
+        if (text.isNotEmpty()) {
+            onSendMessage(text, emptyList()) { sent -> if (sent) draft = "" }
         }
     }
     Column(modifier.fillMaxSize().imePadding()) {

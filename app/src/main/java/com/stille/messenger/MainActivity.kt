@@ -59,6 +59,8 @@ import com.stille.messenger.ui.screens.ProfileScreen
 import com.stille.messenger.ui.screens.SettingsScreen
 import com.stille.messenger.ui.screens.WallpaperBackground
 import com.stille.messenger.ui.screens.WelcomeScreen
+import com.stille.messenger.ui.viewmodel.ChatsViewModel
+import com.stille.coreapi.Method
 import com.stille.messenger.ui.theme.StilleTheme
 import com.stille.messenger.update.UpdateController
 import com.stille.messenger.update.UpdateResult
@@ -193,6 +195,9 @@ fun StilleApp(
 ) {
     val coreService = rememberStilleService()
     val contacts = coreService?.confirmedContacts?.collectStarted()?.value ?: emptyList()
+    val chatsVm: ChatsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val chatsState = chatsVm.uiState.collectAsState().value
+    androidx.compose.runtime.LaunchedEffect(coreService, contacts) { chatsVm.attach(coreService, contacts) }
     val contactViews = coreService?.contactViews?.collectStarted()?.value ?: emptyList()
     val avatarMap = coreService?.avatars?.collectStarted()?.value ?: emptyMap()
     val inviteState = coreService?.inviteState?.collectStarted()?.value ?: com.stille.messenger.service.InviteState()
@@ -206,7 +211,7 @@ fun StilleApp(
     androidx.compose.runtime.LaunchedEffect(updateState.showSheet, showInvite, currentChatCid, showUpdateSheet) {
         if (updateState.showSheet && !showInvite && currentChatCid == null && !showUpdateSheet) showUpdateSheet = true
     }
-    var messages by rememberSaveable { mutableStateOf(emptyList<Message>()) }
+    val currentMessages = currentChatCid?.let { chatsState.chatMessages[it] ?: emptyList() } ?: emptyList()
     var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
     androidx.activity.compose.BackHandler(enabled = currentChatCid != null) { currentChatCid = null }
     val darkTheme = com.stille.messenger.ui.theme.StilleColors.isDark
@@ -257,9 +262,23 @@ fun StilleApp(
                 "chats" -> ChatsScreen(
                     onChatClick = { currentChatCid = it },
                     contacts = contacts,
-                    lastMessage = emptyMap(),
-                    lastMessageTime = emptyMap(),
+                    lastMessage = chatsState.lastMessages,
+                    lastMessageTime = chatsState.lastMessageTime,
                     avatarBytes = avatarMap,
+                    pinnedCid = chatsState.pinnedCid,
+                    onChatAction = { cid, action ->
+                        val method = when (action) {
+                            "pin" -> Method.PIN_CHAT
+                            "unpin" -> Method.UNPIN_CHAT
+                            "delete" -> Method.DELETE_CHAT
+                            "block" -> Method.BLOCK_CONTACT
+                            "unblock" -> Method.UNBLOCK_CONTACT
+                            else -> null
+                        }
+                        if (method != null) chatsVm.runChatAction(cid, method, coreService) {
+                            if (method == Method.DELETE_CHAT && currentChatCid == cid) currentChatCid = null
+                        }
+                    },
                     onInvite = { showInvite = true }
                 )
                 "contacts" -> ContactsScreen(
@@ -325,9 +344,9 @@ fun StilleApp(
             if (contact != null) Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
                 ChatScreen(
                     cid = contact.cid, contactName = contact.name, contactOnline = contact.online,
-                    messages = messages, avatarBytes = avatarMap[contact.cid],
+                    messages = currentMessages, avatarBytes = avatarMap[contact.cid],
                     modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-                    onSendMessage = { _, _ -> }, onBack = { currentChatCid = null }
+                    onSendMessage = { body, entities, done -> chatsVm.sendMessage(contact.cid, body, entities, coreService, done) }, onBack = { currentChatCid = null }
                 )
             }
         }

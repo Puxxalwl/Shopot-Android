@@ -3,6 +3,14 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.0]
+
+### Fixed
+- Wire the conversation composer to `SEND_MESSAGE`, add optimistic rendering and server-ID reconciliation, and retain the draft when the request fails.
+- Show only contacts with message history in Chats.
+- Add long-press actions to pin/unpin, delete, and block/unblock a chat.
+- Fix device-link LAN discovery returning before the holder starts the authenticated connection.
+
 ## [3.0.1]
 
 ### Added

@@ -97,7 +97,7 @@ API удаления фото не реализованы.
 
 ## Подпись релизов и установка
 
-Release-сборка текущей версии `0.2.5` (versionCode `25`) требует постоянный приватный keystore через `STILLE_KEYSTORE_PATH`,
+Release-сборка текущей версии `3.1.0` (versionCode `29`) требует постоянный приватный keystore через `STILLE_KEYSTORE_PATH`,
 `STILLE_STORE_PASSWORD`, `STILLE_KEY_ALIAS`, `STILLE_KEY_PASSWORD`. Debug-сборка
 независима. Не коммитьте keystore и не выводите его содержимое в логи.
 
