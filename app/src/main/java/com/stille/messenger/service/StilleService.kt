@@ -300,7 +300,7 @@ class StilleService : Service() {
         delta.entries.forEach { entry -> if (entry.change == DeltaChange.REMOVED) byCid.remove(entry.cid) else entry.contact?.let { byCid[entry.cid] = it } }
         contactEpoch = delta.epoch
         contactRevision = delta.revision
-        _contactViews.value = byCid.values.takeLast(200)
+        _contactViews.value = byCid.values.toList().takeLast(200)
         _confirmedContacts.value = byCid.values.filter { !it.pending }.map { it.asContact() }.takeLast(200)
         pendingContactIds.removeIf { cid -> byCid[cid]?.pending != true }
     }

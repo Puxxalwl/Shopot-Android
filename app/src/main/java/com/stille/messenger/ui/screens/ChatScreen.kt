@@ -279,7 +279,7 @@ fun ContactsScreen(contacts: List<Contact> = emptyList(), contactViews: List<com
     var query by rememberSaveable { mutableStateOf("") }
     val visible = remember(contacts, contactViews, query) {
         val pending = contactViews.filter { it.pending && contacts.none { contact -> contact.cid == it.cid } }.map {
-            Contact(it.cid, it.online, it.blocked, it.lastSeenMs, copy("Новый контакт", "New contact"), it.avatarId)
+            Contact(it.cid, it.online, it.blocked, it.lastSeenMs, "Новый контакт", it.avatarId)
         }
         com.stille.messenger.ui.filterContacts(contacts + pending, query).sortedBy { it.name.lowercase() }
     }

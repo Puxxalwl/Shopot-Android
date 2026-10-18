@@ -1,7 +1,6 @@
 package com.stille.messenger.ui.screens
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
@@ -96,7 +95,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(if (english) "About Stille" else "О Stille", Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
-                        if (hasUpdate) Box(Modifier.padding(end = 6.dp).width(8.dp).height(8.dp), contentAlignment = Alignment.Center) { Canvas(Modifier.fillMaxSize()) { drawCircle(MaterialTheme.colorScheme.primary) } }
+                        if (hasUpdate) Box(Modifier.padding(end = 6.dp).width(8.dp).height(8.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape))
                         Text(BuildConfig.VERSION_NAME, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }

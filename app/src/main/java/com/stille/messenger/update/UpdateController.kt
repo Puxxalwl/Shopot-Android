@@ -82,22 +82,24 @@ class UpdateController : ViewModel() {
             connection.connectTimeout = 15_000; connection.readTimeout = 30_000
             connection.instanceFollowRedirects = false
             var redirects = 0
-            while (connection.responseCode in 300..399) {
+            while (connection?.responseCode in 300..399) {
+                val current = connection ?: error("Download connection unavailable")
                 check(++redirects <= 5) { "Too many download redirects" }
-                val location = connection.getHeaderField("Location") ?: error("Invalid download redirect")
-                val redirected = URL(URL(connection.url.toString()), location)
+                val location = current.getHeaderField("Location") ?: error("Invalid download redirect")
+                val redirected = URL(URL(current.url.toString()), location)
                 if (redirected.protocol != "https" || redirected.host !in setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")) error("Unsafe download redirect")
                 connection.disconnect()
                 connection = redirected.openConnection() as HttpURLConnection
                 connection.connectTimeout = 15_000; connection.readTimeout = 30_000
                 connection.instanceFollowRedirects = false
             }
-            check(connection.responseCode in 200..299) { "Download failed: HTTP ${connection.responseCode}" }
-            val length = connection.contentLengthLong.takeIf { it > 0 }
+            val activeConnection = connection ?: error("Download connection unavailable")
+            check(activeConnection.responseCode in 200..299) { "Download failed: HTTP ${activeConnection.responseCode}" }
+            val length = activeConnection.contentLengthLong.takeIf { it > 0 }
             check(length == null || length <= MAX_APK_BYTES) { "APK exceeds 50 MiB" }
             val digest = MessageDigest.getInstance("SHA-256")
             var received = 0L
-            connection.inputStream.use { input -> FileOutputStream(temp).use { output ->
+            activeConnection.inputStream.use { input -> FileOutputStream(temp).use { output ->
                 val buffer = ByteArray(64 * 1024)
                 while (true) {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()

@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.viewModels
 import androidx.activity.compose.BackHandler
-import androidx.compose.material3.MaterialTheme
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -13,7 +12,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.stille.messenger.ui.components.SwipeSections
@@ -29,6 +27,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -147,6 +146,7 @@ class MainActivity : ComponentActivity() {
                         language = language,
                         themeMode = themeMode,
                         recovery = recovery,
+                        updates = updates,
                         updateState = updateState,
                         checkUpdatesOnLaunch = checkUpdatesOnLaunch,
                         onToggleAutoUpdates = { enabled -> checkUpdatesOnLaunch = enabled; preferences.updateCheckUpdatesOnLaunch(enabled); updates.setAutoEnabled(enabled) },
@@ -179,6 +179,7 @@ fun StilleApp(
     language: String,
     themeMode: String,
     recovery: RecoveryController? = null,
+    updates: UpdateController? = null,
     updateState: com.stille.messenger.update.UpdateUiState = com.stille.messenger.update.UpdateUiState(),
     checkUpdatesOnLaunch: Boolean = true,
     onToggleAutoUpdates: (Boolean) -> Unit = {},
@@ -221,8 +222,8 @@ fun StilleApp(
         val release = (updateState.result as? UpdateResult.Available)?.release
         if (release != null) com.stille.messenger.ui.screens.UpdateSheet(
             release = release, english = isEnglish,
-            onUpdate = { showUpdateSheet = false; val host = activity; if (host != null) updates.startDownload(host) },
-            onLater = { showUpdateSheet = false; updates.dismissSheet() }
+            onUpdate = { showUpdateSheet = false; activity?.let { host -> if (host.packageManager.canRequestPackageInstalls()) updates?.startDownload(host) else host.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:${host.packageName}"))) } },
+            onLater = { showUpdateSheet = false; updates?.dismissSheet() }
         )
     }
     if (showInvite) InviteSheet(
