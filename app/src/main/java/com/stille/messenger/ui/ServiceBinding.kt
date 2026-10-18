@@ -33,6 +33,28 @@ fun rememberStilleService(): StilleService? {
     return service
 }
 
+/**
+ * Bind without issuing a start command: the caller controls the mode
+ * (normal or unprovisioned recovery) via [StilleService.start] /
+ * [StilleService.startRecovery] before or while bound.
+ */
+@Composable
+fun rememberBoundStilleService(): StilleService? {
+    val context = LocalContext.current
+    var service by remember { mutableStateOf<StilleService?>(null) }
+    DisposableEffect(context) {
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                service = (binder as? StilleService.LocalBinder)?.service
+            }
+            override fun onServiceDisconnected(name: ComponentName?) { service = null }
+        }
+        val bound = context.bindService(Intent(context, StilleService::class.java), connection, Context.BIND_AUTO_CREATE)
+        onDispose { if (bound) context.unbindService(connection) }
+    }
+    return service
+}
+
 @Composable
 fun <T> StateFlow<T>.collectStarted(): State<T> {
     val owner = LocalLifecycleOwner.current

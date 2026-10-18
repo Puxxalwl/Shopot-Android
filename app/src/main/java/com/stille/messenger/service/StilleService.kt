@@ -81,12 +81,7 @@ class StilleService : Service() {
                     _avatarState.value = AvatarState(error = AvatarError.INVALID_IMAGE)
                     return@launch
                 }
-                val response = sendRequest(Method.SET_AVATAR, Requests.setAvatar(data))
-                val (avatarId, size) = Responses.decodeSetAvatar(response.second)
-                if (size != data.size || !matchesAvatarId(avatarId, data)) throw ProtocolException("Invalid avatar acknowledgement")
-                if (!_isCoreReady.value) throw ProtocolException("Core disconnected")
-                _avatars.update { cacheAvatar(it, 0, data) }
-                _avatarState.value = AvatarState(saved = true)
+                setAvatarDataLocked(data)
             } catch (e: TimeoutCancellationException) {
                 _avatarState.value = AvatarState(error = AvatarError.REQUEST_FAILED)
             } catch (e: CancellationException) {
@@ -98,9 +93,105 @@ class StilleService : Service() {
         }
     }
 
+    // Caller must hold avatarMutex and have verified core readiness.
+    private suspend fun setAvatarDataLocked(data: ByteArray) {
+        if (data.isEmpty() || data.size > com.stille.coreapi.Limits.AVATAR_PAYLOAD ||
+            !com.stille.messenger.ui.validAvatarDimensions(data)
+        ) {
+            _avatarState.value = AvatarState(error = AvatarError.INVALID_IMAGE)
+            return
+        }
+        val response = sendRequest(Method.SET_AVATAR, Requests.setAvatar(data))
+        val (avatarId, size) = Responses.decodeSetAvatar(response.second)
+        if (size != data.size || !matchesAvatarId(avatarId, data)) throw ProtocolException("Invalid avatar acknowledgement")
+        if (!_isCoreReady.value) throw ProtocolException("Core disconnected")
+        _avatars.update { cacheAvatar(it, 0, data) }
+        _avatarState.value = AvatarState(saved = true)
+    }
+
     fun retryCore() {
         if (!_isCoreReady.value && startJob?.isActive != true) startCoreIfNeeded()
     }
+
+    // ── Account recovery (CORE-API §4.10) ────────────────────────────────
+
+    /**
+     * CREATE_RECOVERY_BACKUP (41): the core seals seed+profile+contacts
+     * (no history) with the unlock secret; the blob is opaque to this client.
+     * The secret is passed once over the 0700 UDS socket and never stored.
+     */
+    fun createRecoveryBackup(unlockSecret: ByteArray, onResult: (Result) -> Unit) {
+        serviceScope.launch {
+            try {
+                if (!_isCoreReady.value) {
+                    onResult(Result.Error(RecoveryError.CORE_UNAVAILABLE)); return@launch
+                }
+                if (recoveryMode) {
+                    onResult(Result.Error(RecoveryError.NOT_INITIALIZED)); return@launch
+                }
+                val response = sendRequest(
+                    Method.CREATE_RECOVERY_BACKUP,
+                    Requests.createRecoveryBackup(unlockSecret)
+                )
+                val blob = Responses.decodeCreateRecoveryBackup(response.second)
+                onResult(Result.BackupCreated(blob))
+            } catch (e: TimeoutCancellationException) {
+                onResult(Result.Error(RecoveryError.REQUEST_FAILED))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onResult(Result.Error(recoveryError(e)))
+            }
+        }
+    }
+
+    /**
+     * RESTORE_RECOVERY_BACKUP (42): applies the sealed profile to the empty
+     * (unprovisioned) daemon. On success the identity is swapped in, the
+     * profile reloads and the daemon brings networking up by itself.
+     */
+    fun restoreRecoveryBackup(blob: ByteArray, unlockSecret: ByteArray, onResult: (Result) -> Unit) {
+        serviceScope.launch {
+            try {
+                if (!_isCoreReady.value) {
+                    onResult(Result.Error(RecoveryError.CORE_UNAVAILABLE)); return@launch
+                }
+                val response = sendRequest(
+                    Method.RESTORE_RECOVERY_BACKUP,
+                    Requests.restoreRecoveryBackup(blob, unlockSecret)
+                )
+                val profile = Responses.decodeRestoreRecoveryBackup(response.second)
+                recoveryMode = false
+                // The restored profile owns the name/avatar/contacts now.
+                requestContactSnapshot()
+                refreshOwnAvatar()
+                onResult(Result.Restored(profile))
+            } catch (e: TimeoutCancellationException) {
+                onResult(Result.Error(RecoveryError.REQUEST_FAILED))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onResult(Result.Error(recoveryError(e)))
+            }
+        }
+    }
+
+    private fun recoveryError(error: Exception): RecoveryError = when ((error as? ProtocolStatusException)?.code) {
+        com.stille.coreapi.status.NOT_INITIALIZED -> RecoveryError.NOT_INITIALIZED
+        com.stille.coreapi.status.ALREADY_PROVISIONED -> RecoveryError.ALREADY_PROVISIONED
+        com.stille.coreapi.status.BAD_RECOVERY -> RecoveryError.BAD_RECOVERY
+        com.stille.coreapi.status.TOO_BIG -> RecoveryError.TOO_BIG
+        else -> RecoveryError.REQUEST_FAILED
+    }
+
+    /** Typed results for the recovery pair; no plaintext secret in messages. */
+    sealed interface Result {
+        data class BackupCreated(val blob: ByteArray) : Result
+        data class Restored(val profile: Responses.RestoredProfile) : Result
+        data class Error(val error: RecoveryError) : Result
+    }
+
+    enum class RecoveryError { CORE_UNAVAILABLE, NOT_INITIALIZED, ALREADY_PROVISIONED, BAD_RECOVERY, TOO_BIG, REQUEST_FAILED }
 
     fun createInvite(name: String) {
         serviceScope.launch {
@@ -183,6 +274,7 @@ class StilleService : Service() {
 
     companion object {
         const val ACTION_START = "com.stille.messenger.START"
+        const val ACTION_START_RECOVERY = "com.stille.messenger.START_RECOVERY"
         const val ACTION_STOP = "com.stille.messenger.STOP"
         const val NOTIF_CHANNEL_ID = "stille_foreground"
         private const val NOTIF_ID = 1
@@ -193,6 +285,22 @@ class StilleService : Service() {
         fun start(context: Context) {
             val intent = Intent(context, StilleService::class.java).apply {
                 action = ACTION_START
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        /**
+         * Start the daemon in recovery mode: no local seed is created, serve
+         * boots unprovisioned (ephemeral identity, UDS API up) and waits for
+         * RESTORE_RECOVERY_BACKUP (CORE-API.md §4.10).
+         */
+        fun startRecovery(context: Context) {
+            val intent = Intent(context, StilleService::class.java).apply {
+                action = ACTION_START_RECOVERY
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -225,11 +333,27 @@ class StilleService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
+            ACTION_START_RECOVERY -> {
+                startForeground(NOTIF_ID, buildNotification())
+                if (_isCoreReady.value && !recoveryMode) {
+                    // Already provisioned and running: restart into recovery mode.
+                    restartCore(recovery = true)
+                } else {
+                    recoveryMode = true
+                    startCoreIfNeeded()
+                }
+            }
             ACTION_START, null -> {
                 // START_STICKY may recreate the service with a null intent.
                 // Treat that as a normal restart so the local core becomes ready again.
                 startForeground(NOTIF_ID, buildNotification())
-                startCoreIfNeeded()
+                if (_isCoreReady.value && recoveryMode) {
+                    // A normal start must not keep the ephemeral identity alive:
+                    // restart the daemon so init provisions a real profile.
+                    restartCore(recovery = false)
+                } else {
+                    startCoreIfNeeded()
+                }
             }
         }
         return START_STICKY
@@ -251,7 +375,9 @@ class StilleService : Service() {
                     coreDir.mkdirs()
                     coreBinary()
                     stage = "identity"
-                    ensureIdentity()
+                    // Recovery mode: serve boots without a seed (unprovisioned,
+                    // CORE-API §4.10) and waits for RESTORE_RECOVERY_BACKUP.
+                    if (!recoveryMode) ensureIdentity()
                     stage = "process"
                     acquireMulticastLock()
                     startCoreProcess()
@@ -276,7 +402,22 @@ class StilleService : Service() {
         }
     }
 
-    private fun coreBinary(): File = File(applicationInfo.nativeLibraryDir, "libshopot.so").also {
+    /** Kill the daemon and bring it back up in the requested mode. */
+    @Synchronized
+    private fun restartCore(recovery: Boolean) {
+        startJob?.cancel()
+        stopCore()
+        recoveryMode = recovery
+        _isCoreReady.value = false
+        startCoreIfNeeded()
+    }
+
+    /** True while the daemon runs unprovisioned, waiting for a restore. */
+    @Volatile
+    var recoveryMode: Boolean = false
+        private set
+
+    private fun coreBinary(): File = File(applicationInfo.nativeLibraryDir, "libstille.so").also {
         if (!it.isFile || !it.canExecute()) throw IOException("Packaged core executable unavailable")
     }
 
@@ -357,12 +498,45 @@ class StilleService : Service() {
             // Bootstrap: LIST_CONTACTS
             val contactsResp = sendRequest(Method.LIST_CONTACTS, Requests.listContacts())
             val contacts = Responses.decodeListContacts(contactsResp.second)
+
+            // Unprovisioned probe: GET_IDENTITY refuses with NOT_INITIALIZED when
+            // the daemon waits for RESTORE_RECOVERY_BACKUP (§4.10).
+            if (recoveryMode) {
+                try {
+                    sendRequest(Method.GET_IDENTITY, Requests.getIdentity())
+                    // A restored profile swapped in behind the probe: leave mode.
+                    recoveryMode = false
+                } catch (e: ProtocolStatusException) {
+                    if (e.code != com.stille.coreapi.status.NOT_INITIALIZED) throw e
+                }
+            }
+
+            // Own avatar after restart (GET_MY_AVATAR, API 2.5.0): memory-only cache.
+            if (!recoveryMode) refreshOwnAvatar()
+
             _events.tryEmit(CoreEvent.Ready(version, contacts))
 
         } catch (e: Exception) {
             socket?.close()
             throw e
         }
+    }
+
+    /**
+     * Load the own avatar from the encrypted-log-backed cache (method 40).
+     * Used at bootstrap and after a recovery restore; NOT_FOUND is expected
+     * when no avatar is set. Memory-only cache, never a plaintext file.
+     */
+    private suspend fun refreshOwnAvatar() {
+        try {
+            val avatarResp = sendRequest(Method.GET_MY_AVATAR, Requests.getMyAvatar())
+            val (avatarId, data) = Responses.decodeGetMyAvatar(avatarResp.second)
+            if (data.isNotEmpty() && matchesAvatarId(avatarId, data) &&
+                com.stille.messenger.ui.validAvatarDimensions(data)
+            ) {
+                _avatars.update { cacheAvatar(it, 0, data) }
+            }
+        } catch (_: ProtocolStatusException) { /* no avatar yet */ }
     }
 
     private fun startEventListener() {
@@ -429,6 +603,13 @@ class StilleService : Service() {
                 12 -> { // CONTACT_CARD
                     val card = com.stille.coreapi.Events.decodeContactCard(payload)
                     _events.emit(com.stille.messenger.service.CoreEvent.ContactCard(card))
+                }
+                13 -> { // REPLY_RECEIVED: surfaced as an incoming message (API 2.6.0)
+                    val ev = com.stille.coreapi.Events.decodeReplyReceived(payload)
+                    _events.emit(com.stille.messenger.service.CoreEvent.MessageReceived(ev.message, ev.senderName))
+                }
+                14 -> { // CONFIG_CHANGED (API 2.6.0): no config-dependent client state yet
+                    com.stille.coreapi.Events.decodeConfigChanged(payload)
                 }
                 6 -> {  // AVATAR_RECEIVED
                     val avatar = com.stille.coreapi.Events.decodeAvatarReceived(payload)

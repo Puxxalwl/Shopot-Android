@@ -40,11 +40,11 @@
 
     <!-- Notifications -->
     <string name="notification_channel_name">Stille Messenger</string>
-    <string name="notification_channel_desc">Фоновый сервис мессенджера</string>
-    <string name="notification_content">Stille Messenger работает в фоне</string>
+    <string name="notification_channel_desc">Поддерживает подключение Stille</string>
+    <string name="notification_content">Stille работает, чтобы оставаться на связи</string>
 
     <!-- Errors -->
-    <string name="error_core_not_found">Бинарник shopot-core не найден</string>
-    <string name="error_core_failed">Ошибка запуска shopot-core</string>
-    <string name="error_socket_disconnected">Соединение с core потеряно</string>
+    <string name="error_core_not_found">Не хватает файлов приложения. Переустановите Stille.</string>
+    <string name="error_core_failed">Не удалось запустить Stille. Повторите попытку.</string>
+    <string name="error_socket_disconnected">Соединение потеряно. Повторите попытку.</string>
 </resources>

@@ -7,6 +7,10 @@ import kotlin.test.assertTrue
 
 class StilleProtocolTest {
 
+    private fun assertBytes(expected: ByteArray, actual: ByteArray, message: String = "byte arrays differ") {
+        assertTrue(expected.contentEquals(actual), "$message: [${expected.size}] vs [${actual.size}]")
+    }
+
     @Test
     fun `encodeFrame produces correct 16-byte header plus payload`() {
         val payload = byteArrayOf(1, 2, 3, 4)
@@ -80,6 +84,10 @@ class StilleProtocolTest {
         assertEquals(2, Method.GET_VERSION.id)
         assertEquals(7, Method.SEND_MESSAGE.id)
         assertEquals(32, Method.GET_PINNED_MESSAGES.id)
+        assertEquals(35, Method.GET_CONFIG.id)
+        assertEquals(40, Method.GET_MY_AVATAR.id)
+        assertEquals(41, Method.CREATE_RECOVERY_BACKUP.id)
+        assertEquals(42, Method.RESTORE_RECOVERY_BACKUP.id)
         assertEquals("OK", status.name(0))
         assertEquals("BAD_FRAME", status.name(1))
         assertEquals("BAD_ARGS", status.name(3))
@@ -87,7 +95,109 @@ class StilleProtocolTest {
         assertEquals("TOO_BIG", status.name(7))
         assertEquals("BAD_INVITE_CODE", status.name(8))
         assertEquals("NO_SESSION", status.name(12))
+        assertEquals("TOR_UNAVAILABLE", status.name(17))
+        assertEquals("BAD_RECOVERY", status.name(18))
+        assertEquals("NOT_INITIALIZED", status.name(19))
+        assertEquals("ALREADY_PROVISIONED", status.name(20))
         assertEquals("INTERNAL", status.name(255))
+    }
+
+    @Test
+    fun `recovery methods encode per section 4-10`() {
+        val secret = ByteArray(32) { (it * 7).toByte() }
+
+        // CREATE_RECOVERY_BACKUP (41): payload is exactly the 32-byte secret.
+        assertEquals(32, Requests.createRecoveryBackup(secret).size)
+
+        // RESTORE_RECOVERY_BACKUP (42): [backup str32][unlock_secret 32].
+        val blob = ByteArray(500) { 0x5A }
+        val restore = Requests.restoreRecoveryBackup(blob, secret)
+        assertEquals(4 + 500 + 32, restore.size)
+        val reader = FrameReader(restore)
+        assertEquals(500, reader.readU32().toInt())
+        assertEquals(500, reader.readBytes(500).size)
+        assertEquals(32, reader.readBytes(32).size)
+    }
+
+    @Test
+    fun `recovery request encoders reject invalid input`() {
+        assertFailsWith<IllegalArgumentException> { Requests.createRecoveryBackup(ByteArray(31)) }
+        assertFailsWith<IllegalArgumentException> { Requests.createRecoveryBackup(ByteArray(33)) }
+        assertFailsWith<IllegalArgumentException> { Requests.restoreRecoveryBackup(ByteArray(0), ByteArray(32)) }
+        assertFailsWith<IllegalArgumentException> {
+            Requests.restoreRecoveryBackup(ByteArray(Limits.RECOVERY_BLOB + 1), ByteArray(32))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Requests.restoreRecoveryBackup(ByteArray(10), ByteArray(31))
+        }
+    }
+
+    @Test
+    fun `recovery responses decode per section 4-10`() {
+        // CREATE (41): [backup str32].
+        val blob = ByteArray(300) { 0xAB.toByte() }
+        val createPayload = FrameBuffer().apply { writeRaw32(blob) }.toByteArray()
+        assertBytes(blob, Responses.decodeCreateRecoveryBackup(createPayload))
+
+        // RESTORE (42): [bundle 64][fingerprint 32][name str16].
+        val bundle = ByteArray(64) { 1 }
+        val fingerprint = ByteArray(32) { 2 }
+        val restorePayload = FrameBuffer().apply {
+            writeBytes(bundle); writeBytes(fingerprint); writeStr16("Анна")
+        }.toByteArray()
+        val restored = Responses.decodeRestoreRecoveryBackup(restorePayload)
+        assertBytes(bundle, restored.bundle)
+        assertBytes(fingerprint, restored.fingerprint)
+        assertEquals("Анна", restored.name)
+    }
+
+    @Test
+    fun `getMyAvatar decodes avatar id and str16 data`() {
+        val avatarId = ByteArray(16) { 9 }
+        val data = ByteArray(2048) { 0x33 }
+        val payload = FrameBuffer().apply {
+            writeBytes(avatarId)
+            writeU16(data.size)
+            writeBytes(data)
+        }.toByteArray()
+        val (id, decoded) = Responses.decodeGetMyAvatar(payload)
+        assertBytes(avatarId, id)
+        assertBytes(data, decoded)
+    }
+
+    @Test
+    fun `reply and config events decode per section 5`() {
+        // REPLY_RECEIVED (13): [cid][msg_id 16][reply_to 16][ts_ms][name][body][tail].
+        val msgId = ByteArray(16) { 1 }
+        val replyTo = ByteArray(16) { 2 }
+        val payload = FrameBuffer().apply {
+            writeU32(7)
+            writeBytes(msgId)
+            writeBytes(replyTo)
+            writeU64(1234L)
+            writeStr16("Bob")
+            writeStr16("re: hello")
+            writeU8(0) // empty entity tail
+        }.toByteArray()
+        val ev = Events.decodeReplyReceived(payload)
+        assertEquals(7, ev.message.cid)
+        assertBytes(msgId, ev.message.msgId)
+        assertBytes(replyTo, ev.replyTo!!)
+        assertEquals("Bob", ev.senderName)
+        assertEquals("re: hello", ev.message.body)
+
+        // CONFIG_CHANGED (14): [ver u8][flags u32][server_addr str16][tor_addr str16].
+        val config = FrameBuffer().apply {
+            writeU8(1)
+            writeU32(0x00000005)
+            writeStr16("relay.example.com:7777")
+            writeStr16("")
+        }.toByteArray()
+        val cfg = Events.decodeConfigChanged(config)
+        assertEquals(1, cfg.ver)
+        assertEquals(5, cfg.flags)
+        assertEquals("relay.example.com:7777", cfg.serverAddr)
+        assertEquals("", cfg.torAddr)
     }
 
     @Test
@@ -214,5 +324,7 @@ class StilleProtocolTest {
         assertEquals(4, Limits.LIVE_INVITES)
         assertEquals(1, Limits.PINNED_CHAT_MAX)
         assertEquals(16, Limits.PINNED_MSG_MAX)
+        assertEquals(32, Limits.RECOVERY_SECRET)
+        assertEquals(92786, Limits.RECOVERY_BLOB)
     }
 }

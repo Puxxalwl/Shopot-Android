@@ -2,7 +2,7 @@
 
 **English** | [Русский](ru/README.md)
 
-Serverless P2P messenger Android client for the [shopot-core](https://github.com/Puxxalwl/shopot-core) daemon.
+Serverless P2P messenger Android client for the [stille-messenger-core](https://github.com/puxxalwl/stille-messenger-core) daemon.
 
 ## Features
 
@@ -17,6 +17,9 @@ Serverless P2P messenger Android client for the [shopot-core](https://github.com
 - **Files & photos** — up to 64 MB, resumable.
 - **Voice calls** — 16 kHz E2EE with ADPCM+DTX.
 - **Offline delivery** — encrypted outbox with ACKs and dedup.
+- **Account recovery** — a passkey + one core-sealed file in Google Drive
+  restores your identity, profile, contacts and routes on a new device;
+  message history is never synced. See [docs/RECOVERY.md](docs/RECOVERY.md).
 
 ## Screenshots
 
@@ -94,12 +97,12 @@ address-less invite, with multicast enabled, or use a reachable address/relay.
 ### Prerequisites
 - Android 8.0+ (API 26)
 - JDK 17
-- [Zig 0.17.0](https://ziglang.org/download/) (for building shopot-core)
+- [Zig 0.17.0](https://ziglang.org/download/) (for building stille-messenger-core)
 
 ### Build
 
 ```bash
-# 1. Build shopot-core binary for Android arm64-v8a
+# 1. Build stille-messenger-core binary for Android arm64-v8a
 bash ./tools/build-core.sh
 
 # 2. Build the Android app
@@ -152,22 +155,22 @@ app/                      # Android app: Compose UI + foreground service
 ├── ui/                   # Compose screens, components, theme
 ├── service/              # StilleService (foreground) + BootReceiver
 data/                     # Protocol codec (matches CORE-API.md byte-for-byte)
-tools/                    # Cross-compile scripts for shopot-core
-core-src/                 # shopot-core source (git submodule / cloned)
+tools/                    # Cross-compile scripts for stille-messenger-core
+core-src/                 # stille-messenger-core source (git submodule / cloned)
 ```
 
 The `data` module implements the binary UDS protocol codec. The
 `StilleService` foreground service:
-1. Uses `libshopot.so` from Android's installed `nativeLibraryDir` (an executable, not JNI)
-2. Creates the local core identity once with `shopot init`, never overwriting an existing seed
-3. Starts `shopot serve` and connects to `~/.shopot/api.sock` (UDS)
+1. Uses `libstille.so` from Android's installed `nativeLibraryDir` (an executable, not JNI)
+2. Creates the local core identity once with `stille-messenger init`, never overwriting an existing seed (or starts unprovisioned in recovery mode)
+3. Starts `stille-messenger serve` and connects to `~/.shopot/api.sock` (UDS)
 4. Sends `GET_VERSION` to verify core compatibility
 5. Listens for events and broadcasts them to the UI via `StateFlow`
 
 If invites or profile photo actions say that the local core is unavailable,
 rebuild the APK after `bash ./tools/build-core.sh`. The APK must contain
-`lib/arm64-v8a/libshopot.so`, generated from
-`app/src/main/jniLibs/arm64-v8a/libshopot.so` (ignored by Git).
+`lib/arm64-v8a/libstille.so`, generated from
+`app/src/main/jniLibs/arm64-v8a/libstille.so` (ignored by Git).
 Packaging enables native extraction: Android 10+ blocks execution from writable
 app data, so an asset copied into `filesDir` cannot be used. APK packaging fails
 if the AArch64 core is missing; Kotlin-only checks need no binary. Profile and
@@ -185,7 +188,7 @@ accepts it through `ACCEPT_INVITE` and shows the contact only after the trusted
 `CONTACT_JOINED` event.
 
 ```
-A: CREATE_INVITE → "shopot://i/ABC123..."
+A: CREATE_INVITE → "stille://i/ABC123..."
    (share over any messenger or QR)
 B: ACCEPT_INVITE → wait for CONTACT_JOINED → connected
 ```
@@ -202,12 +205,12 @@ B: ACCEPT_INVITE → wait for CONTACT_JOINED → connected
 
 For the core API specification, see:
 [`core-src/zig/docs/CORE-API.md`](core-src/zig/docs/CORE-API.md) or the
-upstream [shopot-core](https://github.com/puxxalwl/shopot-core).
+upstream [stille-messenger-core](https://github.com/puxxalwl/stille-messenger-core).
 
 ## Linux client
 
 The official Linux desktop client is [EryyynIT/shopot](https://github.com/EryyynIT/shopot).
-It is built with Rust and iced, uses the same shopot-core daemon and binary
+It is built with Rust and iced, uses the same core daemon and binary
 UDS API, and is the reference desktop client for cross-platform UX and
 integration behavior. This Android project shares the core contract but does
 not copy Linux client source code.
@@ -220,6 +223,6 @@ same license and retain attribution to `puxxalwl` and `EryyynIT`. See
 [LICENSE](LICENSE), [LICENSE-AGPL-3.0.txt](LICENSE-AGPL-3.0.txt), and
 [NOTICE](NOTICE).
 
-The `core-src/` submodule is an independent shopot-core project and retains
+The `core-src/` submodule is an independent stille-messenger-core project and retains
 its upstream MIT license. The Linux client [EryyynIT/shopot](https://github.com/EryyynIT/shopot)
 is referenced for UX/integration and is not copied into this repository.

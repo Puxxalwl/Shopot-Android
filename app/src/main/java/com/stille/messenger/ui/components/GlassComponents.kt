@@ -2,7 +2,6 @@ package com.stille.messenger.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -46,19 +45,27 @@ import com.stille.messenger.ui.theme.StilleColors
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 20.dp,
+    cornerRadius: Dp = 28.dp,
     backgroundColor: Color? = null,
     borderColor: Color? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     val dark = StilleColors.isDark
-    val shape = RoundedCornerShape(cornerRadius)
-    val base = backgroundColor ?: MaterialTheme.colorScheme.surface.copy(alpha = if (dark) 0.86f else 0.83f)
+    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
+    // 40% translucent glass fill; no offscreen blur, capture or elevated layer.
+    val base = backgroundColor ?: MaterialTheme.colorScheme.surface.copy(alpha = 0.40f)
+    val fill = remember(base) { Brush.linearGradient(listOf(base, base.copy(alpha = base.alpha * 0.85f))) }
+    val edge = remember(dark, borderColor) {
+        Brush.linearGradient(listOf(
+            borderColor ?: Color.White.copy(alpha = if (dark) 0.24f else 0.85f),
+            borderColor ?: Color.White.copy(alpha = if (dark) 0.05f else 0.25f),
+            borderColor ?: Color.White.copy(alpha = if (dark) 0.13f else 0.55f)
+        ))
+    }
     Box(
-        modifier.shadow(8.dp, shape, ambientColor = Color(0xFF263A72).copy(alpha = 0.08f), spotColor = Color(0xFF263A72).copy(alpha = 0.08f))
-            .clip(shape)
-            .background(Brush.linearGradient(listOf(base, base.copy(alpha = (base.alpha - 0.12f).coerceAtLeast(0f)))))
-            .border(0.7.dp, borderColor ?: Color.White.copy(alpha = if (dark) 0.14f else 0.85f), shape),
+        modifier.clip(shape)
+            .background(fill)
+            .border(1.dp, edge, shape),
         content = content
     )
 }
@@ -224,23 +231,24 @@ fun TopAppBarWithSearch(title: String, searchHint: String = "", onSearchChange: 
 @Composable
 fun SegmentedChoice(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     val selectedIndex = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    val animatedIndex by animateFloatAsState(
+    val animatedIndex = animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
-        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "segmented-indicator"
     )
     BoxWithConstraints(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+        modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .selectableGroup().padding(3.dp)
     ) {
         val segmentWidth = maxWidth / options.size.coerceAtLeast(1)
         Box(
-            Modifier.offset(x = segmentWidth * animatedIndex)
-                .width(segmentWidth).heightIn(min = 48.dp).clip(RoundedCornerShape(4.dp))
+            Modifier.offset {
+                androidx.compose.ui.unit.IntOffset((segmentWidth.toPx() * animatedIndex.value).toInt(), 0)
+            }.width(segmentWidth).heightIn(min = 48.dp).clip(RoundedCornerShape(19.dp))
                 .background(MaterialTheme.colorScheme.surface)
         )
         Row(Modifier.fillMaxWidth()) {
-            options.forEachIndexed { index, (value, label) ->
+            options.forEach { (value, label) ->
                 val active = value == selected
                 Box(
                     Modifier.weight(1f).selectable(active, role = Role.RadioButton, onClick = { if (!active) onSelect(value) })

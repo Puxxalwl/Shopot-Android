@@ -37,11 +37,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.stille.coreapi.Contact
 import com.stille.coreapi.Message
+import com.stille.messenger.backup.PasskeyBackupKeys
+import com.stille.messenger.backup.RecoveryController
 import com.stille.messenger.service.StilleService
 import com.stille.messenger.ui.SetupPreferences
 import com.stille.messenger.ui.rememberStilleService
+import com.stille.messenger.ui.rememberBoundStilleService
 import com.stille.messenger.ui.collectStarted
 import com.stille.messenger.ui.screens.InviteSheet
+import com.stille.messenger.ui.screens.RestoreBackupDialog
+import com.stille.messenger.ui.screens.RecoverySection
 import com.stille.messenger.ui.components.BottomNavItem
 import com.stille.messenger.ui.components.BottomBar
 import com.stille.messenger.ui.screens.ChatScreen
@@ -66,6 +71,12 @@ class MainActivity : ComponentActivity() {
             var name by rememberSaveable { mutableStateOf(preferences.name) }
             var language by rememberSaveable { mutableStateOf(preferences.language) }
             var themeMode by rememberSaveable { mutableStateOf(preferences.themeMode) }
+            var showRestore by rememberSaveable { mutableStateOf(false) }
+
+            val recoveryScope = androidx.compose.runtime.rememberCoroutineScope()
+            val recovery = remember {
+                RecoveryController(this, PasskeyBackupKeys(BuildConfig.BACKUP_RP_ID), recoveryScope)
+            }
 
             StilleTheme(themeMode = themeMode, language = language) {
                 if (!setupCompleted) {
@@ -75,6 +86,7 @@ class MainActivity : ComponentActivity() {
                         initialThemeMode = themeMode,
                         onLanguagePreview = { language = it },
                         onThemePreview = { themeMode = it },
+                        onRestore = { showRestore = true },
                         onComplete = { selectedName, selectedLanguage, selectedTheme ->
                             preferences.save(selectedName, selectedLanguage, selectedTheme)
                             name = selectedName
@@ -84,11 +96,42 @@ class MainActivity : ComponentActivity() {
                             StilleService.start(this@MainActivity)
                         }
                     )
+                    if (showRestore) {
+                        // Boot the daemon in unprovisioned recovery mode:
+                        // no local seed is created, RESTORE_RECOVERY_BACKUP
+                        // provisions the profile from the cloud backup.
+                        androidx.compose.runtime.LaunchedEffect(Unit) {
+                            StilleService.startRecovery(this@MainActivity)
+                        }
+                        val restoreService = rememberBoundStilleService()
+                        RestoreBackupDialog(
+                            activity = this,
+                            controller = recovery,
+                            service = restoreService,
+                            language = language,
+                            onRestored = { restoredName ->
+                                // The core has already installed the seed and
+                                // profile itself; only local setup completes here.
+                                preferences.save(restoredName, language, themeMode)
+                                name = restoredName
+                                showRestore = false
+                                setupCompleted = true
+                            },
+                            onDismiss = {
+                                showRestore = false
+                                // Leave recovery mode: stop the unprovisioned
+                                // daemon; a normal setup will start it again.
+                                StilleService.stop(this@MainActivity)
+                            }
+                        )
+                    }
                 } else {
                     StilleApp(
+                        activity = this@MainActivity,
                         name = name,
                         language = language,
                         themeMode = themeMode,
+                        recovery = recovery,
                         onNameChange = {
                             name = it
                             preferences.updateName(it)
@@ -110,9 +153,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun StilleApp(
+    activity: android.app.Activity? = null,
     name: String,
     language: String,
     themeMode: String,
+    recovery: RecoveryController? = null,
     onNameChange: (String) -> Unit,
     onLanguageChange: (String) -> Unit,
     onThemeModeChange: (String) -> Unit
@@ -190,7 +235,19 @@ fun StilleApp(
                     notificationsEnabled = notificationsEnabled,
                     onToggleDarkTheme = { onThemeModeChange(if (it) "dark" else "light") },
                     onToggleLanguage = { onLanguageChange(if (language == "ru") "en" else "ru") },
-                    onToggleNotifications = { notificationsEnabled = it }
+                    onToggleNotifications = { notificationsEnabled = it },
+                    recoverySection = recovery?.let { controller ->
+                        activity?.let { host ->
+                            {
+                                RecoverySection(
+                                    activity = host,
+                                    controller = controller,
+                                    service = coreService,
+                                    language = language
+                                )
+                            }
+                        }
+                    }
                 )
             }
         }

@@ -5,6 +5,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.6]
+
+### Fixed
+- Bump APK metadata to `0.2.6`/versionCode `26` and verify the renamed `libstille.so` in release packaging.
+
+- Recovery enrollment now offers the recovery-code path when passkey creation or PRF is unavailable, while respecting cancellation. Google Drive token requests use the required `oauth2:` prefix and can show interactive consent. Recovery UI callbacks run on the main thread, network/token I/O stays on IO, and the activity owns the operation scope. Added regression tests for passkey fallback and cancellation.
+- Removed full-page GPU blur from section swipes, prepared direct pager neighbours and moved segmented-indicator animation to placement. Theme changes install semantic colors once instead of recomposing all screens for fifteen animated colors; the wallpaper blends in its draw phase. On-device frame timing remains to be measured.
+
+### Changed
+- Dark appearance now uses a Midnight navy palette. Rounded glass cards use a 40% translucent fill and a soft gradient rim without expensive blur or shadow layers; segmented controls have rounded indicators and eased 260ms motion, tab taps use 300ms transitions.
+- Reworded Russian and English setup, profile, invitation, settings and recovery copy using concise everyday language, with actionable recovery errors and an explicit reminder that message history is not restored.
+
+### Added
+- Account recovery backed by core API 2.6.0: the core seals the recovery package (`CREATE_RECOVERY_BACKUP`/`RESTORE_RECOVERY_BACKUP`, §4.10) with ChaCha20-Poly1305 and owns the format; the client only runs the unlock ceremony and stores the sealed blob plus a public metadata sidecar in the user's Google Drive `appDataFolder` (two files: `stille-recovery-v1.bin` / `.meta`). No message history ever leaves the device. New-device restore boots the daemon unprovisioned (serve without a seed — `StilleService.startRecovery`), applies the blob, and the profile (name, avatar, contacts, routes) plus networking come back with an intentionally empty history; cancelling stops the unprovisioned daemon. Unlock secret: WebAuthn `prf` extension of a Google-synced passkey (32-byte salt in the sidecar) with a mandatory random recovery-code fallback shown once. Own avatar after restart now loads via `GET_MY_AVATAR` (40). New statuses `BAD_RECOVERY`/`NOT_INITIALIZED`/`ALREADY_PROVISIONED` and events `REPLY_RECEIVED`/`CONFIG_CHANGED` are wired into the codec; the recovery blob and both Drive files are covered by new JVM tests. `androidx.credentials` (1.5.0) is the only new dependency, used solely for the passkey ceremony. See [docs/RECOVERY.md](docs/RECOVERY.md) ([Russian](ru/RECOVERY.md)).
+- Core submodule switched to `stille-messenger-core` (master `3424e1f`, API 2.6.0): cross-compiled as `libstille.so` (replaces `libshopot.so`); `tools/build-core.sh` tracks the new repo layout.
+
 ### Fixed
 - Set the next APK version to `0.2.5`/versionCode `25` instead of the stale `0.1.0`/`1` metadata. This does not bypass Android's signer compatibility requirement.
 - Release APKs no longer fall back to ephemeral debug signing keys. Require a persistent keystore and verify the pinned signer fingerprint, ZIP integrity and alignment before publishing. Confirmed v0.2.3/v0.2.4 are individually valid but have different signing certificates; updating old installations still requires their original private key.

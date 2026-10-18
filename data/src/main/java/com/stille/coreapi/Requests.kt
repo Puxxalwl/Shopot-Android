@@ -230,6 +230,28 @@ object Requests {
     /** GET_PINNED_MESSAGES (32): [cid u32]. */
     fun getPinnedMessages(cid: Int): ByteArray = encodeU32Payload(cid)
 
+    // ── 4.4 Own avatar (2.5.0) / 4.10 Account recovery (2.6.0) ──────────
+
+    /** GET_MY_AVATAR (40): ∅. Response: [avatar_id 16][data str32]. */
+    fun getMyAvatar(): ByteArray = byteArrayOf()
+
+    /** CREATE_RECOVERY_BACKUP (41): [unlock_secret 32]. */
+    fun createRecoveryBackup(unlockSecret: ByteArray): ByteArray {
+        require(unlockSecret.size == Limits.RECOVERY_SECRET) { "unlock secret must be 32 bytes" }
+        return unlockSecret.copyOf()
+    }
+
+    /** RESTORE_RECOVERY_BACKUP (42): [backup str32][unlock_secret 32]. */
+    fun restoreRecoveryBackup(backup: ByteArray, unlockSecret: ByteArray): ByteArray {
+        require(backup.isNotEmpty()) { "backup blob must not be empty" }
+        require(backup.size <= Limits.RECOVERY_BLOB) { "backup blob exceeds the package cap" }
+        require(unlockSecret.size == Limits.RECOVERY_SECRET) { "unlock secret must be 32 bytes" }
+        val fb = FrameBuffer(4 + backup.size + Limits.RECOVERY_SECRET)
+        fb.writeRaw32(backup)
+        fb.writeBytes(unlockSecret)
+        return fb.toByteArray()
+    }
+
     private fun encodeU32Payload(v: Int): ByteArray {
         val fb = FrameBuffer()
         fb.writeU32(v.toLong())

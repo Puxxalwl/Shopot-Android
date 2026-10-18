@@ -3,25 +3,26 @@
 **English** | [Русский](ru/AGENTS.md)
 
 This file is the repository-wide operating contract for human contributors,
-AI agents, reviewers, and maintainers. It adapts the shopot-core
+AI agents, reviewers, and maintainers. It adapts the stille-messenger-core
 `AGENTS.md` to the Android client layer. The client **never** owns
 cryptography, protocol, or persistent format decisions — those live in
-shopot-core. The client's job is rendering and transport glue.
+stille-messenger-core. The client's job is rendering and transport glue.
 
 ## 1. Project invariants
 
 1. **Serverless client.** No project-operated servers, no telemetry, no
    analytics, no crash reporters. The client connects only to the local
-   `shopot serve` daemon over UDS.
-2. **Minimal dependencies.** Kotlin + Jetpack Compose + Hilt + Coil. No
-   Firebase, no third-party SDKs. Each new dependency needs a justification
-   in `CHANGELOG.md` and must not touch crypto.
+   `stille-messenger serve` daemon over UDS.
+2. **Minimal dependencies.** Kotlin + Jetpack Compose + Hilt + Coil, plus
+   `androidx.credentials` for the passkey-based account recovery ceremony
+   only. No Firebase, no third-party SDKs. Each new dependency needs a
+   justification in `CHANGELOG.md` and must not touch crypto.
 3. **No plaintext on disk.** Avatars and files are stored encrypted by the
    core. Client-side caches are memory-only or encrypted at rest.
 4. **Binary protocol only.** The UDS interface is the binary framed protocol
    defined in [`data/src/main/java/com/stille/coreapi/StilleProtocol.kt`](data/src/main/java/com/stille/coreapi/StilleProtocol.kt).
    Never add JSON serialization for the protocol layer; keep the frame format
-   from `shopot-core/zig/docs/CORE-API.md` §2 verbatim.
+   from `stille-messenger-core/core/docs/CORE-API.md` §2 verbatim.
 5. **Authentication before trust.** Do not render contact identity, name,
    or avatar until the `CONTACT_JOINED` event confirms the JOIN completed.
 6. **Bounded resources.** Message cache ≤ 200 per chat. Avatar cache ≤ 20.
@@ -35,8 +36,8 @@ shopot-core. The client's job is rendering and transport glue.
 
 ## 2. Source of truth
 
-- The active implementation of shopot-core lives under
-  [`shopot-core/zig/`](https://github.com/Puxxalwl/shopot-core) — the client
+- The active implementation of stille-messenger-core lives under
+  [`core-src/core/`](https://github.com/puxxalwl/stille-messenger-core) — the client
   must track the current `CORE-API.md`. Wire changes land in
   `CHANGELOG.md` inside the core repo; check before implementing a new method
   or event.
@@ -49,7 +50,7 @@ shopot-core. The client's job is rendering and transport glue.
 
 - **Android Gradle Plugin 8.7.3+**
 - **Kotlin 2.1.0** (with compose compiler)
-- **Zig 0.17.0** (only for cross-compiling shopot-core; see `tools/`)
+- **Zig 0.17.0** (only for cross-compiling stille-messenger-core; see `tools/`)
 - **JDK 17**
 - Do not instruct contributors to install OS packages.
 
@@ -63,7 +64,7 @@ shopot-core. The client's job is rendering and transport glue.
 | UI screens | `app/src/main/java/com/stille/messenger/ui/screens/` |
 | Theme | `app/src/main/java/com/stille/messenger/ui/theme/` |
 | DI | `app/src/main/java/com/stille/messenger/di/` |
-| Native binary | `app/src/main/jniLibs/arm64-v8a/shopot` (generated) |
+| Native binary | `app/src/main/jniLibs/arm64-v8a/libstille.so` (generated) |
 
 ## 5. Kotlin coding rules
 
@@ -86,7 +87,7 @@ shopot-core. The client's job is rendering and transport glue.
 
 ## 7. Protocol and persistence rules
 - Before using a new CORE-API method, verify its id and payload format against
-  `shopot-core/zig/docs/CORE-API.md`.
+  `stille-messenger-core/core/docs/CORE-API.md`.
 - Never deviate from the 16-byte LE frame header layout.
 - Wire changes require updating the codec AND a CHANGELOG entry here.
 
@@ -104,11 +105,11 @@ shopot-core. The client's job is rendering and transport glue.
 ## 10. Documentation
 - Update `README.md` for user-visible setup changes.
 - Update this `AGENTS.md` for policy changes.
-- Update `DOCS.md` for doc-writing rules (mirrors shopot-core `docs/DOCSTYLE.md`).
+- Update `DOCS.md` for doc-writing rules (mirrors stille-messenger-core `docs/DOCSTYLE.md`).
 - Add a `CHANGELOG.md` entry for every user-visible change.
 
 ## 11. AI-agent operating rules
-Same as shopot-core: inspect repo instructions and source before editing;
+Same as stille-messenger-core: inspect repo instructions and source before editing;
 do not invent APIs; keep edits in scope; stop when uncertain.
 
 ## 12. License and conduct

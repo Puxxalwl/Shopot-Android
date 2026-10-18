@@ -118,7 +118,7 @@ jobs:
           assert len(actual) == 1 and actual[0].lower() == expected, 'Release signing certificate mismatch'
           with zipfile.ZipFile('app/build/outputs/apk/release/app-release.apk') as apk:
               assert apk.testzip() is None, 'APK archive integrity failed'
-              assert 'lib/arm64-v8a/libshopot.so' in apk.namelist(), 'Missing core executable'
+              assert 'lib/arm64-v8a/libstille.so' in apk.namelist(), 'Missing core executable'
           print('APK archive, native core and pinned signing certificate verified')
           PY
           "$tools/zipalign" -c -v 4 "$apk"

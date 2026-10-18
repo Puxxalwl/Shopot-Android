@@ -2,7 +2,7 @@
 
 **English** | [Русский](ru/README.md)
 
-Android-клиент для демона [shopot-core](https://github.com/Puxxalwl/shopot-core).
+Android-клиент для демона [stille-messenger-core](https://github.com/puxxalwl/stille-messenger-core).
 
 ## Возможности
 - **P2P — без серверов** — прямой TCP (порты 7777–7786), LAN discovery или self-hosted relay
@@ -14,6 +14,9 @@ Android-клиент для демона [shopot-core](https://github.com/Puxxal
 - **Файлы и фото** — до 64 МБ
 - **Голосовые звонки** — 16 кГц E2EE, ADPCM + DTX
 - **Офлайн-доставка** — зашифрованный outbox с ACK и dedup
+- **Восстановление аккаунта** — passkey + один запечатанный ядром файл в
+  Google Drive восстанавливают личность, профиль, контакты и маршруты на новом
+  устройстве; история сообщений не синхронизируется. См. [ru/RECOVERY.md](ru/RECOVERY.md).
 
 ## Первый запуск
 
@@ -73,7 +76,7 @@ API удаления фото не реализованы.
 ## Сборка
 
 ```bash
-# 1. Сборка shopot-core для Android (требует Zig 0.17.0)
+# 1. Сборка stille-messenger-core для Android (требует Zig 0.17.0)
 ./tools/build-core.sh
 
 # 2. Сборка Android-приложения
@@ -135,7 +138,7 @@ Play Market.
 ## Linux-клиент
 
 Официальный Linux-клиент — [EryyynIT/shopot](https://github.com/EryyynIT/shopot).
-Он использует тот же shopot-core и бинарный UDS API, поэтому служит
+Он использует тот же stille-messenger-core и бинарный UDS API, поэтому служит
 референсом desktop UX и интеграции.
 
 ## Архитектура
@@ -143,21 +146,21 @@ Play Market.
 ```
 app/                      # Android-приложение: UI + foreground service
 data/                     # Кодек бинарного протокола (соответствует CORE-API.md)
-core-src/                 # Исходники shopot-core (cloned)
+core-src/                 # Исходники stille-messenger-core (cloned)
 tools/                    # Скрипты кросс-компиляции
 ```
 
 `StilleService` — foreground service, который:
-1. Использует `libshopot.so` из установленного Android `nativeLibraryDir` (исполняемый файл, не JNI)
-2. Один раз создаёт локальную identity через `shopot init`, никогда не перезаписывая существующий seed
-3. Запускает `shopot serve` и подключается к UDS `$HOME/.shopot/api.sock`
+1. Использует `libstille.so` из установленного Android `nativeLibraryDir` (исполняемый файл, не JNI)
+2. Один раз создаёт локальную identity через `stille-messenger init`, никогда не перезаписывая существующий seed (или стартует без профиля в recovery-режиме)
+3. Запускает `stille-messenger serve` и подключается к UDS `$HOME/.shopot/api.sock`
 4. Отправляет `GET_VERSION` для проверки совместимости
 5. Слушает события и рассылает их в UI через `StateFlow`
 
 Если приглашения или фото профиля сообщают, что локальное ядро недоступно,
 пересоберите APK после `bash ./tools/build-core.sh`. В APK должен быть
-`lib/arm64-v8a/libshopot.so`, создаваемый из
-`app/src/main/jniLibs/arm64-v8a/libshopot.so` (исключён из Git).
+`lib/arm64-v8a/libstille.so`, создаваемый из
+`app/src/main/jniLibs/arm64-v8a/libstille.so` (исключён из Git).
 Включена распаковка native-файлов: Android 10+ запрещает исполнение из записываемой
 папки приложения, поэтому копия assets в `filesDir` не подходит. Упаковка APK
 завершается ошибкой при отсутствии AArch64-ядра; проверка только Kotlin не требует
@@ -175,7 +178,7 @@ QR; Stille принимает его через `ACCEPT_INVITE` и показы�
 доверенного события `CONTACT_JOINED`.
 
 ```
-A: CREATE_INVITE → "shopot://i/ABC123..."
+A: CREATE_INVITE → "stille://i/ABC123..."
    (делимся в любом мессенджере или через QR)
 B: ACCEPT_INVITE → ждём CONTACT_JOINED → соединение установлено
 ```
@@ -188,6 +191,6 @@ B: ACCEPT_INVITE → ждём CONTACT_JOINED → соединение устан
 `puxxalwl` и `EryyynIT`. См. [LICENSE](../LICENSE),
 [LICENSE-AGPL-3.0.txt](../LICENSE-AGPL-3.0.txt) и [NOTICE](../NOTICE).
 
-Submodule `core-src/` — независимый проект shopot-core с собственной MIT
+Submodule `core-src/` — независимый проект stille-messenger-core с собственной MIT
 лицензией. Linux-клиент [EryyynIT/shopot](https://github.com/EryyynIT/shopot)
 только указан как референс и не копируется в этот репозиторий.

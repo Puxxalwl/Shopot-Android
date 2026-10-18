@@ -32,10 +32,10 @@
     <string name="version">Stille Messenger v0.1.0</string>
 
     <string name="notification_channel_name">Stille Messenger</string>
-    <string name="notification_channel_desc">Background messenger service</string>
-    <string name="notification_content">Stille Messenger is running in background</string>
+    <string name="notification_channel_desc">Keeps Stille connected</string>
+    <string name="notification_content">Stille is running to stay connected</string>
 
-    <string name="error_core_not_found">shopot-core binary not found</string>
-    <string name="error_core_failed">Failed to start shopot-core</string>
-    <string name="error_socket_disconnected">Connection to core lost</string>
+    <string name="error_core_not_found">App files are missing. Reinstall Stille.</string>
+    <string name="error_core_failed">Could not start Stille. Try again.</string>
+    <string name="error_socket_disconnected">Connection lost. Try again.</string>
 </resources>

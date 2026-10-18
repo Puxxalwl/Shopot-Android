@@ -186,4 +186,37 @@ object Responses {
             }
         }
     }
+
+    // ── 4.4 Own avatar (2.5.0) / 4.10 Account recovery (2.6.0) ──────────
+
+    /** GET_MY_AVATAR (40): [avatar_id 16][data str16 1..16000]. */
+    fun decodeGetMyAvatar(payload: ByteArray): Pair<ByteArray, ByteArray> {
+        val r = FrameReader(payload)
+        val avatarId = r.readBytes(16)
+        val data = r.readBytes(r.readU16().toInt())
+        return avatarId to data
+    }
+
+    /** CREATE_RECOVERY_BACKUP (41): [backup str32] — opaque blob, never parsed. */
+    fun decodeCreateRecoveryBackup(payload: ByteArray): ByteArray {
+        return FrameReader(payload).readRaw32()
+    }
+
+    /**
+     * RESTORE_RECOVERY_BACKUP (42): [bundle 64][fingerprint 32][name str16].
+     * Same shape as GET_IDENTITY plus the restored profile name.
+     */
+    fun decodeRestoreRecoveryBackup(payload: ByteArray): RestoredProfile {
+        val r = FrameReader(payload)
+        val bundle = r.readBytes(64)
+        val fingerprint = r.readBytes(32)
+        val name = r.readStr16()
+        return RestoredProfile(bundle, fingerprint, name)
+    }
+
+    data class RestoredProfile(
+        val bundle: ByteArray,      // 64 bytes: enc_pk ‖ sign_pk
+        val fingerprint: ByteArray, // 32 bytes: BLAKE2s-256(bundle)
+        val name: String            // 1..32 UTF-8 bytes
+    )
 }

@@ -82,9 +82,9 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
             SegmentedChoice(listOf("share" to if (english) "My invitation" else "Пригласить", "accept" to if (english) "Join" else "Добавить"), mode, { mode = it })
             Spacer(Modifier.height(20.dp))
             if (!state.ready) {
-                Text(if (english) "Local core is unavailable. Invitations need a running shopot core." else "Локальное ядро недоступно. Для приглашений нужен запущенный shopot.", color = MaterialTheme.colorScheme.error)
+                Text(if (english) "Connection unavailable. Try again." else "Подключение недоступно. Попробуйте ещё раз.", color = MaterialTheme.colorScheme.error)
                 OutlinedButton(onClick = onRetryCore, enabled = !state.busy) {
-                    Text(if (english) "Retry core" else "Повторить запуск ядра")
+                    Text(if (english) "Try again" else "Повторить")
                 }
                 Spacer(Modifier.height(12.dp))
             }
@@ -131,7 +131,7 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
                     }
                 }
                 Spacer(Modifier.height(14.dp))
-                Text(if (english) "Single-use. Valid until the core restarts. Without a direct address, connect on the same local network. Share only with the intended person." else "Одноразовое. Действует до перезапуска ядра. Без прямого адреса подключение работает в одной локальной сети. Передавайте только нужному человеку.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (english) "Use once, before the app restarts. Try the same Wi-Fi network if you cannot connect. Share only with the person you want to add." else "На один раз, до перезапуска приложения. Если не получается подключиться, используйте одну сеть Wi-Fi. Отправляйте только тому, кого хотите добавить.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Button(onClick = { liveScanning = true }, enabled = !scanning, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                     Text(if (english) "Scan with camera" else "Сканировать камерой")
@@ -147,13 +147,13 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
                 Button(onClick = { onAccept(input); input = "" }, enabled = input.isNotBlank() && state.ready && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoundedCornerShape(18.dp)) {
                     Text(if (english) "Connect" else "Подключиться")
                 }
-                if (state.accepted) Text(if (english) "Invitation accepted. Waiting for an authenticated connection…" else "Приглашение принято. Ждём подтверждённого подключения…", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium)
+                if (state.accepted) Text(if (english) "Invitation accepted. Waiting for the other person…" else "Приглашение принято. Ждём собеседника…", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium)
             }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 16.dp))
             if (state.joined) Text(if (english) "Connection confirmed" else "Подключение подтверждено", Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.primary)
             state.error?.let { error ->
                 val text = when (error) {
-                    InviteError.CORE_UNAVAILABLE -> if (english) "Core is unavailable" else "Ядро недоступно"
+                    InviteError.CORE_UNAVAILABLE -> if (english) "Connection unavailable. Try again." else "Подключение недоступно. Повторите попытку."
                     InviteError.INVALID_CODE -> if (english) "Invalid invitation. Ask for a new one." else "Приглашение недействительно. Попросите новое."
                     InviteError.LIMIT_REACHED -> if (english) "Four invitations are already active. Use an existing one." else "Уже созданы четыре приглашения. Используйте существующее."
                     InviteError.REQUEST_FAILED -> if (english) "Could not complete the request. Try again." else "Не удалось выполнить запрос. Попробуйте ещё раз."

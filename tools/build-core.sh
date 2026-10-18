@@ -1,9 +1,9 @@
 #!/bin/bash
 # tools/build-core.sh
-# Cross-compile shopot-core (Zig) for Android arm64-v8a.
+# Cross-compile stille-messenger-core (Zig) for Android arm64-v8a.
 #
 # Requires: Zig 0.17.0 (https://ziglang.org/download/)
-# Output: app/src/main/jniLibs/arm64-v8a/libshopot.so
+# Output: app/src/main/jniLibs/arm64-v8a/libstille.so
 # Executable (not JNI): Android extracts lib*.so into its executable native directory.
 #
 set -euo pipefail
@@ -12,15 +12,15 @@ ZIG_VERSION="0.17.0"
 REPO_DIR="$(cd "$(dirname "$0")/../core-src" && pwd)"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "=== Building shopot-core for Android arm64-v8a ==="
+echo "=== Building stille-messenger-core for Android arm64-v8a ==="
 
-# 1. Ensure shopot-core source is available as the declared submodule.
+# 1. Ensure the core source is available as the declared submodule.
 if [ ! -f "$PROJECT_DIR/.gitmodules" ]; then
     echo "ERROR: .gitmodules is missing; initialize the repository submodules first." >&2
     exit 1
 fi
-if [ ! -f "$REPO_DIR/zig/build.zig" ]; then
-    echo "ERROR: core-src is not initialized. Run: git submodule update --init --recursive" >&2
+if [ ! -f "$REPO_DIR/core/build.zig" ]; then
+    echo "ERROR: core-src is not initialized (or pre-2.3 layout). Run: git submodule update --init --recursive" >&2
     exit 1
 fi
 
@@ -42,7 +42,7 @@ fi
 echo "Zig: $(zig version)"
 
 # 3. Cross-compile for Android arm64-v8a
-cd "$REPO_DIR/zig"
+cd "$REPO_DIR/core"
 
 echo "Building with ReleaseSmall optimize..."
 zig build -j1 -Doptimize=ReleaseSmall \
@@ -52,15 +52,17 @@ zig build -j1 -Doptimize=ReleaseSmall \
 OUTPUT_DIR="$PROJECT_DIR/app/src/main/jniLibs/arm64-v8a"
 mkdir -p "$OUTPUT_DIR"
 
-BINARY="$REPO_DIR/zig/zig-out/bin/shopot-zig"
+BINARY="$REPO_DIR/core/zig-out/bin/stille-messenger"
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: build output not found at $BINARY"
-    ls -la "$REPO_DIR/zig/zig-out/bin/" 2>/dev/null || true
+    ls -la "$REPO_DIR/core/zig-out/bin/" 2>/dev/null || true
     exit 1
 fi
 
-cp "$BINARY" "$OUTPUT_DIR/libshopot.so"
-chmod 755 "$OUTPUT_DIR/libshopot.so"
+cp "$BINARY" "$OUTPUT_DIR/libstille.so"
+chmod 755 "$OUTPUT_DIR/libstille.so"
+# The shopot-era packaged name is obsolete; never ship both.
+rm -f "$OUTPUT_DIR/libshopot.so"
 
-echo "✓ shopot-core executable: $OUTPUT_DIR/libshopot.so ($(stat -c%s "$OUTPUT_DIR/libshopot.so") bytes)"
+echo "✓ stille-messenger-core executable: $OUTPUT_DIR/libstille.so ($(stat -c%s "$OUTPUT_DIR/libstille.so") bytes)"
 echo "Done."

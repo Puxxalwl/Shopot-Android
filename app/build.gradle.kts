@@ -22,8 +22,12 @@ android {
         minSdk = 26
         targetSdk = 35
         // Increase for published releases to support ordered updates and avoid downgrades.
-        versionCode = 25
-        versionName = "0.2.5"
+        versionCode = 26
+        versionName = "0.2.6"
+
+        // WebAuthn RP id for the account-recovery passkey. Must be a domain this
+        // app claims via assetlinks before store distribution.
+        buildConfigField("String", "BACKUP_RP_ID", "\"stille.app\"")
 
         testInstrumentationRunner = "com.stille.messenger.HiltTestRunner"
 
@@ -45,7 +49,7 @@ android {
         jniLibs {
             // ProcessBuilder needs a real executable file, not a ZIP entry.
             useLegacyPackaging = true
-            keepDebugSymbols += "**/libshopot.so"
+            keepDebugSymbols += "**/libstille.so"
         }
         resources {
             excludes += setOf(
@@ -117,7 +121,7 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verify
 
 // Keep compile-only checks lightweight, but never produce an APK without its core.
 val verifyCoreBinary by tasks.registering {
-    val binary = layout.projectDirectory.file("src/main/jniLibs/arm64-v8a/libshopot.so")
+    val binary = layout.projectDirectory.file("src/main/jniLibs/arm64-v8a/libstille.so")
     inputs.file(binary).optional()
     doLast {
         val file = binary.asFile
@@ -164,6 +168,11 @@ dependencies {
 
     // Coil (image loading — no Firebase)
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Passkeys (CredentialManager) for account-recovery key derivation.
+    // Platform/Google Play Services only: no app crypto code, no network SDK.
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
 
     // Offline QR encoding/decoding only; no network SDK or crypto involvement.
     implementation("com.google.zxing:core:3.5.3")

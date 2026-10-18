@@ -29,7 +29,8 @@ fun SettingsScreen(
     onToggleLanguage: () -> Unit = {},
     onToggleNotifications: (Boolean) -> Unit = {},
     themeMode: String = if (darkTheme) "dark" else "light",
-    onThemeModeChange: (String) -> Unit = { onToggleDarkTheme(it == "dark") }
+    onThemeModeChange: (String) -> Unit = { onToggleDarkTheme(it == "dark") },
+    recoverySection: (@Composable () -> Unit)? = null
 ) {
     val english = language == "en"
     var about by rememberSaveable { mutableStateOf(false) }
@@ -51,6 +52,8 @@ fun SettingsScreen(
                 }
             }
         }
+        item { Spacer(Modifier.height(24.dp)) }
+        recoverySection?.let { item { it() } }
         item { Spacer(Modifier.height(24.dp)) }
         item {
             GlassSurface(Modifier.padding(horizontal = 24.dp).fillMaxWidth()) {
@@ -79,7 +82,7 @@ fun SettingsScreen(
     if (about) AlertDialog(
         onDismissRequest = { about = false },
         title = { Text("Stille") },
-        text = { Text(if (english) "An open-source messenger client. No analytics or advertising SDKs. Powered by the local shopot-core." else "Открытый клиент мессенджера. Без аналитики и рекламных SDK. Работает с локальным shopot-core.") },
+        text = { Text(if (english) "An open-source messenger. No ads or tracking." else "Мессенджер с открытым кодом. Без рекламы и слежки.") },
         confirmButton = { TextButton(onClick = { about = false }) { Text(if (english) "Done" else "Готово") } }
     )
 }

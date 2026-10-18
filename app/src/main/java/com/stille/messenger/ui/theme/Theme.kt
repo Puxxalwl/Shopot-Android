@@ -8,7 +8,6 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,14 +41,25 @@ private val DarkColors = darkColorScheme(
     onPrimaryContainer = Color(0xFFDCEBFF),
     secondary = Color(0xFFB8C1D0),
     onSecondary = Color(0xFF27303D),
-    background = Color(0xFF0B0C0F),
-    onBackground = Color(0xFFF3F4F7),
-    surface = Color(0xFF15161A),
-    onSurface = Color(0xFFF3F4F7),
-    surfaceVariant = Color(0xFF202228),
-    onSurfaceVariant = Color(0xFFA9AFBA),
-    outline = Color(0xFF3D414A),
-    outlineVariant = Color(0xFF2A2D34),
+    // Dark — Midnight: deep navy rather than neutral charcoal.
+    background = Color(0xFF080F20),
+    onBackground = Color(0xFFF0F4FF),
+    surface = Color(0xFF14213B),
+    onSurface = Color(0xFFF0F4FF),
+    surfaceVariant = Color(0xFF1D2D4A),
+    onSurfaceVariant = Color(0xFFB1BED5),
+    outline = Color(0xFF485B7B),
+    outlineVariant = Color(0xFF2C3D5B),
+    surfaceDim = Color(0xFF080F20),
+    surfaceBright = Color(0xFF2B3D5B),
+    surfaceContainerLowest = Color(0xFF060C19),
+    surfaceContainerLow = Color(0xFF101B30),
+    surfaceContainer = Color(0xFF14213B),
+    surfaceContainerHigh = Color(0xFF1D2D4A),
+    surfaceContainerHighest = Color(0xFF263957),
+    secondaryContainer = Color(0xFF263957),
+    onSecondaryContainer = Color(0xFFDCE7FC),
+    surfaceTint = Color(0xFF64A9FF),
     error = Color(0xFFFF8A80)
 )
 
@@ -115,22 +125,9 @@ fun StilleTheme(
         "light" -> false
         else -> isSystemInDarkTheme()
     }
-    val targetColors = if (darkTheme) DarkColors else LightColors
-    @Composable fun smooth(color: Color): Color = androidx.compose.animation.animateColorAsState(
-        color, tween(160), label = "theme-color"
-    ).value
-    val colors = targetColors.copy(
-        primary = smooth(targetColors.primary), onPrimary = smooth(targetColors.onPrimary),
-        primaryContainer = smooth(targetColors.primaryContainer),
-        onPrimaryContainer = smooth(targetColors.onPrimaryContainer),
-        secondary = smooth(targetColors.secondary), onSecondary = smooth(targetColors.onSecondary),
-        background = smooth(targetColors.background), onBackground = smooth(targetColors.onBackground),
-        surface = smooth(targetColors.surface), onSurface = smooth(targetColors.onSurface),
-        surfaceVariant = smooth(targetColors.surfaceVariant),
-        onSurfaceVariant = smooth(targetColors.onSurfaceVariant),
-        outline = smooth(targetColors.outline), outlineVariant = smooth(targetColors.outlineVariant),
-        error = smooth(targetColors.error)
-    )
+    // Install semantic colors once per selection, not once per animation frame.
+    // The wallpaper animates in its draw phase without recomposing every screen.
+    val colors = if (darkTheme) DarkColors else LightColors
 
     // Keep the existing locale behavior while the UI remains fully Compose-driven.
     androidx.compose.runtime.LaunchedEffect(language) {

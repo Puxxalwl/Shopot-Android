@@ -65,7 +65,21 @@ enum class Method(val id: Int) {
     SEND_CONTACT(29),
     PIN_MESSAGE(30),
     UNPIN_MESSAGE(31),
-    GET_PINNED_MESSAGES(32);
+    GET_PINNED_MESSAGES(32),
+    // 2.3.0 — replies and reactions
+    SEND_REPLY_MESSAGE(33),
+    GET_REACTIONS(34),
+    // 2.4.0 — core configuration and client DB
+    GET_CONFIG(35),
+    SET_CONFIG(36),
+    WRITE_DB(37),
+    READ_DB(38),
+    DELETE_DB(39),
+    // 2.5.0 — own avatar after restart
+    GET_MY_AVATAR(40),
+    // 2.6.0 — account recovery without history
+    CREATE_RECOVERY_BACKUP(41),
+    RESTORE_RECOVERY_BACKUP(42);
 
     companion object {
         fun fromId(id: Int) = entries.firstOrNull { it.id == id }
@@ -86,7 +100,9 @@ enum class Event(val id: Int) {
     CONTACT_PROFILE(9),
     BLOCKED_BY_PEER(10),
     FILE_SENT(11),
-    CONTACT_CARD(12);
+    CONTACT_CARD(12),
+    REPLY_RECEIVED(13),
+    CONFIG_CHANGED(14);
 
     companion object {
         fun fromId(id: Int) = entries.firstOrNull { it.id == id }
@@ -113,6 +129,10 @@ object status {
     const val NO_CALL = 14
     const val NO_RELAY = 15
     const val TRANSPORT_FAILED = 16
+    const val TOR_UNAVAILABLE = 17
+    const val BAD_RECOVERY = 18
+    const val NOT_INITIALIZED = 19
+    const val ALREADY_PROVISIONED = 20
     const val INTERNAL = 255
 
     fun name(code: Int): String = when (code) {
@@ -133,6 +153,10 @@ object status {
         NO_CALL -> "NO_CALL"
         NO_RELAY -> "NO_RELAY"
         TRANSPORT_FAILED -> "TRANSPORT_FAILED"
+        TOR_UNAVAILABLE -> "TOR_UNAVAILABLE"
+        BAD_RECOVERY -> "BAD_RECOVERY"
+        NOT_INITIALIZED -> "NOT_INITIALIZED"
+        ALREADY_PROVISIONED -> "ALREADY_PROVISIONED"
         INTERNAL -> "INTERNAL"
         else -> "UNKNOWN($code)"
     }
@@ -164,6 +188,9 @@ object Limits {
     const val SEARCH_QUERY_MAX = 4096
     const val ENTITY_MAX = 32
     const val SPOOFER_MAX = 255  // link value, code-block lang
+    // 2.6.0 — recovery package (§4.10 / §6)
+    const val RECOVERY_SECRET = 32
+    const val RECOVERY_BLOB = 92786
 }
 
 // ── Exceptions ────────────────────────────────────────────────────────────

@@ -5,11 +5,12 @@
 *(This is the Russian mirror of AGENTS.md. It must be updated in the same commit as the English version.)*
 
 Этот файл — контракт для контрибьюторов, ИИ-агентов и обзорщиков.
-Он адаптирует `AGENTS.md` из shopot-core к Android-клиенту.
+Он адаптирует `AGENTS.md` из stille-messenger-core к Android-клиенту.
 
 ## 1. Инварианты
 1. Без собственных серверов, телеметрии, аналитики.
-2. Минимум зависимостей: Kotlin + Compose + Hilt + Coil.
+2. Минимум зависимостей: Kotlin + Compose + Hilt + Coil, плюс
+   `androidx.credentials` только для passkey-восстановления аккаунта.
 3. Нет plaintext на диске.
 4. Только бинарный протокол (UDS).
 5. Аутентификация перед доверием.
@@ -18,5 +19,5 @@
 8. Главный поток отзывчив.
 
 ## 2. Источник правды
-- Активная реализация shopot-core — в `shopot-core/zig/`.
+- Активная реализация stille-messenger-core — в `core-src/core/`.
 - Клиент должен следить за `CORE-API.md`.

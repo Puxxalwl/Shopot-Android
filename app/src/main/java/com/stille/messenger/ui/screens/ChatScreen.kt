@@ -47,18 +47,37 @@ private fun copy(ru: String, en: String) = if (StilleColors.language == "en") en
 
 @Composable
 fun WallpaperBackground(modifier: Modifier = Modifier) {
-    val dark = StilleColors.isDark
-    val base = MaterialTheme.colorScheme.background
-    Box(modifier.fillMaxSize().background(base).drawWithCache {
-        val top = androidx.compose.ui.graphics.Brush.radialGradient(
-            listOf(if (dark) androidx.compose.ui.graphics.Color(0xFF253B63) else androidx.compose.ui.graphics.Color(0xFFD8E6FF), androidx.compose.ui.graphics.Color.Transparent),
-            center = androidx.compose.ui.geometry.Offset(size.width * 0.05f, size.height * 0.08f), radius = size.width * 1.25f
-        )
-        val lower = androidx.compose.ui.graphics.Brush.radialGradient(
-            listOf(if (dark) androidx.compose.ui.graphics.Color(0xFF34294F) else androidx.compose.ui.graphics.Color(0xFFE8DFF7), androidx.compose.ui.graphics.Color.Transparent),
-            center = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.7f), radius = size.width * 1.15f
-        )
-        onDrawBehind { drawRect(top); drawRect(lower) }
+    // Read animation values only during drawing: no per-frame composition/layout.
+    val midnight = androidx.compose.animation.core.animateFloatAsState(
+        if (StilleColors.isDark) 1f else 0f,
+        androidx.compose.animation.core.tween(280), label = "midnight-wallpaper"
+    )
+    Box(modifier.fillMaxSize().drawWithCache {
+        fun glow(color: androidx.compose.ui.graphics.Color, x: Float, y: Float) =
+            androidx.compose.ui.graphics.Brush.radialGradient(
+                listOf(color, androidx.compose.ui.graphics.Color.Transparent),
+                center = androidx.compose.ui.geometry.Offset(size.width * x, size.height * y),
+                radius = size.width * 1.25f
+            )
+        val lightTop = glow(androidx.compose.ui.graphics.Color(0xFFD8E6FF), 0.05f, 0.08f)
+        val lightLower = glow(androidx.compose.ui.graphics.Color(0xFFE8DFF7), 1f, 0.7f)
+        val darkTop = glow(androidx.compose.ui.graphics.Color(0xFF172F56), 0.05f, 0.08f)
+        val darkLower = glow(androidx.compose.ui.graphics.Color(0xFF192742), 1f, 0.7f)
+        onDrawBehind {
+            val progress = midnight.value
+            drawRect(androidx.compose.ui.graphics.lerp(
+                androidx.compose.ui.graphics.Color(0xFFF7F7F9),
+                androidx.compose.ui.graphics.Color(0xFF080F20), progress
+            ))
+            if (progress < 1f) {
+                drawRect(lightTop, alpha = 1f - progress)
+                drawRect(lightLower, alpha = 1f - progress)
+            }
+            if (progress > 0f) {
+                drawRect(darkTop, alpha = progress)
+                drawRect(darkLower, alpha = progress)
+            }
+        }
     })
 }
 
@@ -218,14 +237,14 @@ fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null,
                     Text(copy("Подготовка и сохранение…", "Preparing and saving…"), style = MaterialTheme.typography.bodySmall)
                 }
                 if (!coreReady) {
-                    Text(copy("Для сохранения фото нужно запущенное ядро", "The core must be running to save your photo"), style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = onRetryCore) { Text(copy("Повторить запуск", "Retry core")) }
+                    Text(copy("Фото можно сохранить после подключения", "Connect to save your photo"), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = onRetryCore) { Text(copy("Повторить", "Try again")) }
                 }
                 if (avatarState.saved) Text(copy("Фото сохранено", "Photo saved"), color = MaterialTheme.colorScheme.primary)
                 avatarState.error?.let { error ->
                     Text(when (error) {
                         com.stille.messenger.service.AvatarError.INVALID_IMAGE -> copy("Не удалось прочитать фото. Выберите другое изображение до 8 МБ.", "Could not read photo. Choose another image up to 8 MB.")
-                        com.stille.messenger.service.AvatarError.CORE_UNAVAILABLE -> copy("Ядро недоступно", "Core unavailable")
+                        com.stille.messenger.service.AvatarError.CORE_UNAVAILABLE -> copy("Нет подключения. Повторите попытку.", "Not connected. Try again.")
                         com.stille.messenger.service.AvatarError.REQUEST_FAILED -> copy("Не удалось сохранить фото. Попробуйте ещё раз.", "Could not save photo. Please try again.")
                     }, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }

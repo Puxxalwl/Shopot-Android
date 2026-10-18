@@ -28,6 +28,7 @@ fun WelcomeScreen(
     initialThemeMode: String,
     onLanguagePreview: (String) -> Unit = {},
     onThemePreview: (String) -> Unit = {},
+    onRestore: () -> Unit = {},
     onComplete: (name: String, language: String, themeMode: String) -> Unit
 ) {
     var name by rememberSaveable { mutableStateOf(initialName) }
@@ -95,6 +96,7 @@ fun WelcomeScreen(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                 shape = RoundedCornerShape(16.dp)
             ) { Text(if (english) "Continue" else "Продолжить", style = MaterialTheme.typography.labelLarge) }
+            TextButton(onClick = onRestore) { Text(if (english) "Restore account" else "Восстановить аккаунт", color = MaterialTheme.colorScheme.primary) }
             TextButton(onClick = { about = true }) { Text(if (english) "Why Stille?" else "Почему Stille?", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
@@ -103,8 +105,8 @@ fun WelcomeScreen(
         onDismissRequest = { about = false },
         title = { Text(if (english) "Why Stille?" else "Почему Stille?") },
         text = { Text(if (english)
-            "Stille is an open-source client for shopot-core. No advertising SDKs or analytics. Connections and encryption are handled by the local core, not a Stille server.\n\nOpen source alone does not guarantee security. Your device, core version and connection settings matter too."
-        else "Stille — открытый клиент для shopot-core. Без рекламных SDK и аналитики. Соединениями и шифрованием занимается локальное ядро, а не сервер Stille.\n\nОткрытый код сам по себе не гарантирует безопасность: важны защита устройства, версия ядра и настройки соединения.") },
+            "An open-source messenger without ads or tracking. Messages are encrypted. Keep your phone protected and the app up to date."
+        else "Мессенджер с открытым кодом, без рекламы и слежки. Сообщения зашифрованы. Защищайте телефон и обновляйте приложение.") },
         confirmButton = { TextButton(onClick = { about = false }) { Text(if (english) "Got it" else "Понятно") } }
     )
 }

@@ -112,11 +112,54 @@ object Events {
         return ContactCard(cid, name, bundle, addr)
     }
 
+    /**
+     * REPLY_RECEIVED (13, API 2.6.0):
+     * `[cid u32][msg_id 16][reply_to 16][ts_ms u64][name str16][body str16][entity tail]`.
+     */
+    fun decodeReplyReceived(payload: ByteArray): MessageReceivedEvent {
+        val r = FrameReader(payload)
+        val cid = r.readU32().toInt()
+        val msgId = r.readBytes(16)
+        val replyTo = r.readBytes(16)
+        val tsMs = r.readU64()
+        val name = r.readStr16()
+        val body = r.readStr16()
+        val entities = decodeEntityTail(r)
+        val flags = 0.toByte()  // incoming — not mine, not delivered
+        return MessageReceivedEvent(
+            message = Message(cid, msgId, flags, tsMs, body, entities),
+            senderName = name,
+            replyTo = replyTo
+        )
+    }
+
+    /**
+     * CONFIG_CHANGED (14, API 2.6.0) payload — the new config blob
+     * (§4.9: `[ver u8][flags u32][server_addr str16][tor_addr str16]`).
+     */
+    fun decodeConfigChanged(payload: ByteArray): ConfigBlob {
+        val r = FrameReader(payload)
+        val ver = r.readU8()
+        val flags = r.readU32().toInt()
+        val serverAddr = r.readStr16()
+        val torAddr = r.readStr16()
+        return ConfigBlob(ver, flags, serverAddr, torAddr)
+    }
+
     // ── Event wrappers ──────────────────────────────────────────────────
 
     data class MessageReceivedEvent(
         val message: Message,
-        val senderName: String
+        val senderName: String,
+        /** REPLY_RECEIVED only: the quoted message id (16 bytes); null otherwise. */
+        val replyTo: ByteArray? = null
+    )
+
+    data class ConfigBlob(
+        val ver: Int,
+        val flags: Int,
+        val serverAddr: String,  // str16, empty = none
+        val torAddr: String      // str16, empty = none
     )
 
     data class MessageDeliveredEvent(
