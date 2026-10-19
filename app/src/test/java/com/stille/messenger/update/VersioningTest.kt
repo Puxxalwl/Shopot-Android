@@ -17,4 +17,10 @@ class VersioningTest {
         assertFalse(Versioning.isValid("v1.x"))
         assertFalse(Versioning.isValid("1..2"))
     }
+
+    @Test fun releaseAssetNameIncludesVTagPrefix() {
+        assertEquals("Stille-Messenger-v3.1.0.apk", releaseApkAssetName("v3.1.0"))
+        assertEquals(null, releaseApkAssetName("3.1.0"))
+        assertEquals(null, releaseApkAssetName("v3.x.0"))
+    }
 }

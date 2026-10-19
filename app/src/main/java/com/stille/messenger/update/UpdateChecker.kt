@@ -7,7 +7,10 @@ import java.net.URL
 import org.json.JSONObject
 
 private const val LATEST_RELEASE_URL = "https://api.github.com/repos/Puxxalwl/Stille-Messenger-Android/releases/latest"
-private const val APK_PREFIX = "Stille-Messenger-v"
+private const val APK_PREFIX = "Stille-Messenger-"
+
+internal fun releaseApkAssetName(tag: String): String? =
+    tag.takeIf { it.startsWith('v') && Versioning.isValid(it) }?.let { "$APK_PREFIX$it.apk" }
 private const val MAX_METADATA = 1024 * 1024
 
 data class ReleaseInfo(val version: String, val apkUrl: String, val digest: String?, val size: Long?)
@@ -54,12 +57,14 @@ class GitHubReleaseChecker {
             val tag = root.optString("tag_name")
             if (!Versioning.isValid(tag)) return UpdateResult.Error("Invalid release version")
             val version = tag.removePrefix("v")
+            val expectedAssetName = releaseApkAssetName(tag)
+                ?: return UpdateResult.Error("Invalid release version")
             if (Versioning.compare(version, BuildConfig.VERSION_NAME) <= 0) return UpdateResult.Current
             val assets = root.optJSONArray("assets") ?: return UpdateResult.Error("APK asset is missing")
             var apk: JSONObject? = null
             for (i in 0 until assets.length()) {
                 val item = assets.optJSONObject(i) ?: continue
-                if (item.optString("name") == "$APK_PREFIX$version.apk") { apk = item; break }
+                if (item.optString("name") == expectedAssetName) { apk = item; break }
             }
             val asset = apk ?: return UpdateResult.Error("APK asset is missing")
             val url = asset.optString("browser_download_url")

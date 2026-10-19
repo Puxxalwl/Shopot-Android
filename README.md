@@ -120,7 +120,7 @@ bash ./tools/build-core.sh
 
 ### Release signing and installation
 
-Release builds (current version `3.1.0`, versionCode `29`) require a persistent private keystore via `STILLE_KEYSTORE_PATH`,
+Release builds (current version `3.1.1`, versionCode `30`) require a persistent private keystore via `STILLE_KEYSTORE_PATH`,
 `STILLE_STORE_PASSWORD`, `STILLE_KEY_ALIAS`, and `STILLE_KEY_PASSWORD`. Debug
 builds remain independent. Never commit a keystore or paste its contents into logs.
 

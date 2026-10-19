@@ -3,6 +3,11 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.1]
+
+### Fixed
+- Match release APK assets using the published `Stille-Messenger-v*.apk` filename, including the `v` prefix from the release tag.
+
 ## [3.1.0]
 
 ### Fixed
