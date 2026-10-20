@@ -27,10 +27,34 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.Stille.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Deeplink: https://stille.im/invite/{full invite code without
+                 the stille:// scheme} — the link carries the invitation itself,
+                 the site is only a redirector. autoVerify needs assetlinks on
+                 stille.im; until then Android offers the app alongside the
+                 browser. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="stille.im"
+                    android:pathPrefix="/invite/" />
+            </intent-filter>
+            <!-- Full invite codes (stille://i/…, stille://i3/…) shared
+                 directly in messengers or handed over by a browser. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="stille" android:host="i" />
+                <data android:scheme="stille" android:host="i3" />
             </intent-filter>
         </activity>
 

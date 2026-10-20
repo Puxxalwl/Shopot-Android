@@ -77,8 +77,12 @@ import android.provider.Settings
 class MainActivity : ComponentActivity() {
     private val updates: UpdateController by viewModels()
 
+    /** Full invite code extracted from an ACTION_VIEW deeplink, awaiting UI processing. */
+    private val deeplink = androidx.compose.runtime.mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        deeplink.value = parseInviteDeeplink(intent)
         val setupPreferences = SetupPreferences(this)
         if (setupPreferences.completed) {
             StilleService.start(this)
@@ -155,6 +159,8 @@ class MainActivity : ComponentActivity() {
                         name = name,
                         language = language,
                         themeMode = themeMode,
+                        deeplink = deeplink.value,
+                        onDeeplinkConsumed = { deeplink.value = null },
                         recovery = recovery,
                         updates = updates,
                         updateState = updateState,
@@ -180,6 +186,24 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        deeplink.value = parseInviteDeeplink(intent)
+    }
+
+    /**
+     * Extracts the invite code from an ACTION_VIEW intent — a stille:// code
+     * or a stille.im/invite link (which carries the code itself). Never logs
+     * the code, only that a recognized deeplink arrived.
+     */
+    private fun parseInviteDeeplink(intent: Intent): String? {
+        if (intent.action != Intent.ACTION_VIEW) return null
+        val data = intent.dataString ?: return null
+        val code = com.stille.messenger.ui.InviteDeeplinks.parse(data) ?: return null
+        StilleLog.i("ui", "invite-deeplink", "code-present")
+        return code
+    }
 }
 
 @Composable
@@ -188,6 +212,8 @@ fun StilleApp(
     name: String,
     language: String,
     themeMode: String,
+    deeplink: String? = null,
+    onDeeplinkConsumed: () -> Unit = {},
     recovery: RecoveryController? = null,
     updates: UpdateController? = null,
     updateState: com.stille.messenger.update.UpdateUiState = com.stille.messenger.update.UpdateUiState(),
@@ -208,8 +234,12 @@ fun StilleApp(
     val contactViews = coreService?.contactViews?.collectStarted()?.value ?: emptyList()
     val avatarMap = coreService?.avatars?.collectStarted()?.value ?: emptyMap()
     val inviteState = coreService?.inviteState?.collectStarted()?.value ?: com.stille.messenger.service.InviteState()
+    val profileLinkState = coreService?.profileLink?.collectStarted()?.value ?: com.stille.messenger.service.ProfileLinkState()
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
     var showInvite by rememberSaveable { mutableStateOf(false) }
+    // Deeplink routing state: prefilled accept input and sheet mode.
+    var pendingInviteInput by rememberSaveable { mutableStateOf("") }
+    var pendingInviteMode by rememberSaveable { mutableStateOf("share") }
     val avatarState = coreService?.avatarState?.collectStarted()?.value ?: com.stille.messenger.service.AvatarState()
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) coreService?.setAvatar(uri)
@@ -296,12 +326,42 @@ fun StilleApp(
             onLater = { showUpdateSheet = false; updates?.dismissSheet() }
         )
     }
+    // A tapped invite link or code prefills the accept tab: the link carries
+    // the complete invite itself, so no core round-trip is needed to route it.
+    androidx.compose.runtime.LaunchedEffect(deeplink) {
+        val code = deeplink ?: return@LaunchedEffect
+        pendingInviteInput = code
+        pendingInviteMode = "accept"
+        showInvite = true
+        onDeeplinkConsumed()
+    }
+
+    // The profile link is deterministic — (re)issuing the mode-4 invite on
+    // every sheet open is idempotent and restores relay presence.
+    androidx.compose.runtime.LaunchedEffect(showInvite, inviteState.ready, coreService) {
+        if (showInvite && coreService != null && inviteState.ready) coreService.loadProfileLink(name)
+    }
+
     if (showInvite) InviteSheet(
         state = inviteState,
+        profileLink = profileLinkState,
         onCreate = { coreService?.createInvite(name) },
-        onAccept = { coreService?.acceptInvite(it, name) },
+        onAccept = { raw ->
+            // Links carrying the full code (stille.im/invite/…) resolve to the
+            // code itself; anything else is passed through for core validation.
+            val code = com.stille.messenger.ui.InviteDeeplinks.parse(raw) ?: raw.trim()
+            coreService?.acceptInvite(code, name)
+        },
         onRetryCore = { coreService?.retryCore() },
-        onClose = { showInvite = false }
+        onLoadProfileLink = { coreService?.loadProfileLink(name) },
+        onRotateProfileLink = { coreService?.rotateProfileLink(name) },
+        initialMode = pendingInviteMode,
+        initialInput = pendingInviteInput,
+        onClose = {
+            showInvite = false
+            pendingInviteInput = ""
+            pendingInviteMode = "share"
+        }
     )
     Box(modifier = Modifier.fillMaxSize()) {
         WallpaperBackground()

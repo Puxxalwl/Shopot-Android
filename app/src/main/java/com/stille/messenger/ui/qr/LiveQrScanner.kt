@@ -71,6 +71,7 @@ import com.google.zxing.qrcode.QRCodeReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.stille.messenger.diag.StilleLog
 import com.stille.messenger.service.INVITE_PREFIXES
+import com.stille.messenger.service.validInviteTarget
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -668,7 +669,7 @@ private class LiveQrCameraView(
         hints: Map<DecodeHintType, Any>,
     ): Result = reader.decode(BinaryBitmap(HybridBinarizer(source)), hints)
 
-    private fun isValidInvite(value: String): Boolean = isStilleInvite(value)
+    private fun isValidInvite(value: String): Boolean = validInviteTarget(value)
 
     private companion object {
         const val OPEN_ATTEMPTS = 2

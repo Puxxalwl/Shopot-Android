@@ -8,7 +8,7 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
-import com.stille.messenger.service.validInviteInput
+import com.stille.messenger.service.validInviteTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -27,7 +27,7 @@ internal suspend fun readInviteImage(resolver: ContentResolver, uri: Uri): Strin
             val pixels = IntArray(bitmap.width * bitmap.height)
             bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
             val result = QRCodeReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(bitmap.width, bitmap.height, pixels))), mapOf(DecodeHintType.TRY_HARDER to true))
-            result.text.trim().takeIf(::validInviteInput)
+            result.text.trim().takeIf(::validInviteTarget)
         } finally { bitmap.recycle() }
     } catch (_: Exception) { null }
 }
