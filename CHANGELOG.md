@@ -3,6 +3,38 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.3.0]
+
+### Added
+- **Permanent invite link**: the invitation sheet now also shows
+  `https://stille.im/invite/{code}` — the persistent profile code
+  (`CREATE_INVITE_EX` mode 4: deterministic, never burns, no invite-registry
+  limit) with the `stille://` scheme stripped. The link carries the complete
+  invitation itself, so anyone who receives it connects directly; the
+  stille.im site is only a redirector. **Reset link** rotates the profile
+  code (`REGENERATE_PROFILE_CODE`): a leaked link stops validating
+  immediately, existing contacts are unaffected.
+- Deeplink handling: `https://stille.im/invite/i/…` and `stille.im/invite/i3/…`
+  links (with or without the `https://` prefix; plain `http://` rejected), and
+  direct `stille://i…` / `stille://i3…` codes, open the app (`ACTION_VIEW`,
+  `singleTask` MainActivity) and route into the accept flow. The client
+  reconstructs the code locally by re-attaching the `stille://` scheme — no
+  server-side state or round-trip. The camera scanner, QR image import and
+  pasted input accept all of these through the same parsing.
+- Codec support for API 2.8.0: methods 52–54 (`GENERATE_SHORT_CODE`,
+  `DECODE_SHORT_CODE`, `REGENERATE_PROFILE_CODE`), `CREATE_INVITE_EX` mode 4
+  and client-side Crockford short-code normalization (mirroring core
+  `invite.zig`, including the I/L→1, O→0, U→V typo repairs and the positional
+  checksum), with unit tests against the core golden vector `N9S5WMD9D`.
+
+### Changed
+- Core submodule updated to API 2.8.0 (event-driven LAN discovery and the
+  `stille-messenger-core` rename included). The generated
+  `GeneratedCoreApi.kt` now pins 54 methods and the 2.8.0 version string.
+- CI (core): the `build (macos-14, aarch64-macos, native)` push matrix entry
+  was removed from the core repository's `ci` workflow — a separate macOS
+  sub-core will own that target.
+
 ## [3.2.0]
 
 ### Changed
