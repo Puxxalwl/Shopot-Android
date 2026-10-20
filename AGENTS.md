@@ -61,7 +61,7 @@ stille-messenger-core. The client's job is rendering and transport glue.
 | Subsystem | Files |
 |---|---|
 | Protocol codec | `data/src/main/java/com/stille/coreapi/` |
-| Foreground service | `services/src/main/kotlin/com/stille/messenger/service/` |
+| Foreground service | `app/src/main/java/com/stille/messenger/service/` |
 | UI components | `app/src/main/java/com/stille/messenger/ui/components/` |
 | UI screens | `app/src/main/java/com/stille/messenger/ui/screens/` |
 | Theme | `app/src/main/java/com/stille/messenger/ui/theme/` |
@@ -105,9 +105,10 @@ stille-messenger-core. The client's job is rendering and transport glue.
 - Sign off: `Signed-off-by: Name <email>` (DCO).
 
 ## 10. Documentation
-- Update `README.md` for user-visible setup changes.
+- `docs/` map and doc-writing rules: `DOCS.md` (mirrors stille-messenger-core `docs/DOCSTYLE.md`).
+- Update `docs/USAGE.md` for user-visible behavior changes, `docs/BUILD.md`
+  for build/signing changes, `docs/ARCHITECTURE.md` for structural changes.
 - Update this `AGENTS.md` for policy changes.
-- Update `DOCS.md` for doc-writing rules (mirrors stille-messenger-core `docs/DOCSTYLE.md`).
 - Add a `CHANGELOG.md` entry for every user-visible change.
 
 ## 11. AI-agent operating rules

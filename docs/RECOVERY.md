@@ -1,4 +1,4 @@
-# Account Recovery (core 2.6.0)
+# Account recovery
 
 **English** | [Русский](../ru/RECOVERY.md)
 
@@ -85,25 +85,24 @@ the last good copy.
 Enable on the old device (Settings → Account recovery):
 
 ```text
-Включить восстановление
-→ создать passkey (или получить код)
+Enable recovery
+→ create passkey (or receive the recovery code)
 → CREATE_RECOVERY_BACKUP(unlock_secret)
-→ upload blob + sidecar to Drive
+→ upload blob + sidecar to the chosen cloud
 ```
 
 Backup cadence: re-run the flow ("Update backup") after profile-affecting
 changes (name, avatar, contacts, routes, blocks). Uploads replace the
-files in place (PATCH), so a failed upload never destroys the last good
-copy.
+files in place, so a failed upload never destroys the last good copy.
 
 Restore on a new device (Welcome screen → Restore account):
 
 ```text
-запустить ядро в recovery-режиме (serve без seed)
-→ выбрать хранилище (Google Диск / Яндекс Диск / WebDAV)
-→ подтвердить passkey / ввести код
+start the core in recovery mode (serve without a seed)
+→ choose storage (Google Drive / Yandex Disk / WebDAV)
+→ confirm passkey / enter the code
 → RESTORE_RECOVERY_BACKUP(blob, unlock_secret)
-→ тот же аккаунт, пустая история
+→ same account, empty history
 ```
 
 The daemon starts **unprovisioned** (`StilleService.startRecovery`): no

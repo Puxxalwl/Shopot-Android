@@ -1,14 +1,24 @@
-# SECURITY (RU)
+# Политика безопасности
 
-**English** | [Русский](ru/SECURITY.md)
+[English](../SECURITY.md) | **Русский**
+
+Полная модель угроз и инвентарь криптографии — в репозитории
+stille-messenger-core:
+[SECURITY.md](https://github.com/puxxalwl/stille-messenger-core/blob/master/SECURITY.md)
+(англ.).
 
 Для Android-клиента:
-- Клиент **никогда** не работает с ключами — seed лежит в
-  `$HOME/.shopot/zig-seed` (0600), принадлежит процессу `shopot serve`.
-- Нет телеметрии, crash-репортёров, аналитики.
 
-Политика кибербезопасности и инвентарь криптографии — в репозитории
-[shopot-core](https://github.com/Puxxalwl/shopot-core/blob/master/SECURITY.md).
+- Клиент **никогда не работает с ключами** — seed личности лежит в
+  `~/.stille-messenger/zig-seed` (0600) и принадлежит процессу
+  `stille-messenger-core serve`.
+- Криптографии в клиенте нет.
+- Телеметрии, crash-репортёров и аналитики нет.
 
-Сообщайте о уязвимостях приватно: откройте GitHub Security Advisory в
-shopot-core, или напишите на security@shopot.io.
+## Сообщение об уязвимости
+
+Не открывайте публичный issue. Используйте приватную вкладку GitHub
+*Security → Report a vulnerability* в этом репозитории или в
+[stille-messenger-core](https://github.com/puxxalwl/stille-messenger-core).
+Укажите затронутый коммит, описание и, если возможно, proof of concept.
+Подтверждение — в течение 72 часов.

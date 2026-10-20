@@ -3,6 +3,18 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Documentation restructured. `README.md` is a compact entry point (logo
+  header, badges, docs index); user guide, build/release and architecture
+  material moved to `docs/USAGE.md`, `docs/BUILD.md` and
+  `docs/ARCHITECTURE.md` with RU mirrors. Generated screenshots and their
+  generator were removed; the stille.im owl mascot and a logo header were
+  added under `docs/assets/`. Stale `shopot-core` references, broken
+  `CORE-API.md` links and outdated feature claims (file transfer, voice
+  calls are core-only) were corrected across all documents.
+
 ## [3.4.0]
 
 ### Added

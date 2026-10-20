@@ -1,45 +1,90 @@
-# Contributing to Stille-Messenger (RU)
+# Участие в Stille-Messenger
 
-**English** | [Русский](ru/CONTRIBUTING.md)
+[English](../CONTRIBUTING.md) | **Русский**
 
-Правила взноса, адаптированы из shopot-core.
+Правила взносов, адаптированы из kernel-процесса ядра. Прочитайте перед
+открытием PR; контракт для контрибьюторов (включая правила для агентов) —
+[AGENTS.md](../AGENTS.md) (англ.).
 
-## 1. Инварианты
-- Без собственных серверов, телеметрии, аналитики
-- Нет Firebase / crash-репортёров / аналитики
-- Нет plaintext на диске
-- Нет JSON в протоколе (только бинарный UDS)
+## 1. Базовые правила (инварианты — нарушения отклоняются)
 
-## 2. Настройка
+- **Без серверов, телеметрии и сторонних вызовов в клиенте.** Клиент
+  подключается только к локальному демону `stille-messenger-core serve`
+  по UDS.
+- **Без проприетарного кода в комплекте.** Без crash-репортёров,
+  аналитических SDK и Firebase. Каждая новая зависимость требует
+  обоснования в `CHANGELOG.md` и не должна касаться криптографии.
+- **Без plaintext-кеша клиента.** Аватары и файлы приходят из
+  зашифрованного хранилища ядра; memory-кеши клиента transient и
+  ограничены.
+- **Без JSON в проводе протокола.** UDS-интерфейс — бинарный фреймовый
+  протокол из `CORE-API.md`. Никогда не сериализуйте данные протокола в
+  JSON.
+- **Без новых криптографических примитивов.** Клиент не касается ключей;
+  вся криптография — в ядре.
+
+## 2. Настройка окружения
+
 ```bash
 git clone https://github.com/Puxxalwl/Stille-Messenger-Android.git
 cd Stille-Messenger-Android
-./gradlew :app:assembleDebug
+bash ./tools/build-core.sh     # требуется Zig 0.17.0
+./gradlew :app:assembleDebug   # требуется JDK 17 + Android SDK
 ```
 
-Инструменты: JDK 17, AGP 8.7+, Kotlin 2.1+.
+Полные инструкции по сборке, тестам и подписи релизов:
+[BUILD.md](BUILD.md). Версии инструментов: [AGENTS.md](../AGENTS.md) §3
+(англ.).
 
-## 3. Архитектура исходников
-| Подсистема | Папка |
+## 3. Структура исходников
+
+| Подсистема | Каталог |
 |---|---|
-| Протокол | `data/src/main/java/com/stille/coreapi/` |
-| Сервис | `app/src/main/java/com/stille/messenger/service/` |
-| UI | `app/src/main/java/com/stille/messenger/ui/` |
+| Кодек протокола | `data/src/main/java/com/stille/coreapi/` |
+| Сервис + UDS | `app/src/main/java/com/stille/messenger/service/` |
+| Экраны / компоненты UI | `app/src/main/java/com/stille/messenger/ui/` |
+| Тема | `app/src/main/java/com/stille/messenger/ui/theme/` |
+| Хранилища восстановления | `app/src/main/java/com/stille/messenger/backup/` |
+| DI | `app/src/main/java/com/stille/messenger/di/` |
+| Документация | корень `*.md`, `docs/*.md`, `ru/*.md` |
 
-## 4. Коммиты
-Формат: `component: imperative summary` (≤ 72 символов).
-Префиксы: `ui`, `coreapi`, `service`, `build`, `docs`, `i18n`.
-Обязательно: `Signed-off-by: Name <email>` (DCO).
+## 4. Сообщения коммитов
+
+Одно логическое изменение на коммит. Тема ≤ 72 символов:
+
+```text
+ui: fix avatar loading flicker in chat list
+```
+
+Префиксы: `ui`, `coreapi`, `service`, `di`, `build`, `docs`, `i18n`.
+
+Тело (перенос 72 колонки): что и почему, а не как. Укажите, как
+тестировали. Подпись `Signed-off-by: Name <email>` (DCO).
 
 ## 5. Чек-лист PR
-- [ ] `:data:testDebugUnitTest` и `:app:testDebugUnitTest` проходят
-- [ ] Новые тесты для нового поведения
-- [ ] Нет логирования тел тел, ключей, кодов приглашений
-- [ ] Протокол соответствует CORE-API.md
-- [ ] Обновлена документация (EN + RU)
-- [ ] Добавлен CHANGELOG entry
 
-## 6. Лицензия
-Оригинальный Android-клиент распространяется по AGPL-3.0-or-later.
-Вклад лицензируется на тех же условиях. `core-src/` сохраняет лицензию
-upstream shopot-core.
+- [ ] `:app:lint` и `:app:testDebugUnitTest` проходят
+- [ ] У нового поведения есть тесты
+- [ ] Нет plaintext-логирования сообщений, ключей и инвайт-кодов
+- [ ] Формат провода совпадает с `CORE-API.md` байт в байт
+- [ ] Документация обновлена (EN + RU одним коммитом), если изменение
+      видно пользователю
+- [ ] Добавлена запись в `CHANGELOG.md`
+
+## 6. Ревью
+
+1. PR проверяются по чек-листу выше.
+2. Замечания ревьюера закрываются в той же ветке.
+3. Документация ревьюится с тем же чек-листом, что и код.
+
+## 7. Безопасность
+
+Не открывайте публичные issues об уязвимостях. См.
+[SECURITY.md](SECURITY.md).
+
+## 8. Лицензия
+
+Оригинальный Android-клиент под AGPL-3.0-or-later. Отправляя взнос, вы
+соглашаетесь лицензировать его на тех же условиях; строка `Signed-off-by`
+фиксирует согласие DCO. Сабмодуль `core-src/` независим и сохраняет свою
+upstream MIT-лицензию.

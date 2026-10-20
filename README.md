@@ -1,259 +1,125 @@
-# Stille Messenger (Android)
+<p align="center">
+  <img src="docs/assets/stille-logo-header.png" width="118" alt="Stille Messenger logo">
+</p>
+<h1 align="center">Stille Messenger</h1>
 
-**English** | [Русский](ru/README.md)
+<p align="center">
+  Serverless end-to-end-encrypted messenger for Android.<br>
+  Client of the <a href="https://github.com/puxxalwl/stille-messenger-core">stille-messenger-core</a> daemon.
+</p>
 
-Serverless P2P messenger Android client for the [stille-messenger-core](https://github.com/puxxalwl/stille-messenger-core) daemon.
+<p align="center">
+  <a href="https://github.com/Puxxalwl/Stille-Messenger-Android/actions/workflows/ci.yml"><img src="https://github.com/Puxxalwl/Stille-Messenger-Android/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-0067DB" alt="License: AGPL-3.0-or-later"></a>
+  <img src="https://img.shields.io/badge/Android-8.0%2B-0067DB" alt="Android 8.0+">
+  <img src="https://img.shields.io/badge/core%20API-2.8.0-0067DB" alt="Core API 2.8.0">
+</p>
 
-## Features
+<p align="center"><strong>English</strong> · <a href="ru/README.md">Русский</a></p>
 
-- **P2P — no servers.** Direct TCP (ports 7777–7786), LAN discovery, or
-  self-hosted relay (IP hiding).
-- **End-to-end encrypted.** The client never touches keys — the `stille-messenger-core serve`
-  daemon owns all cryptography (double ratchet, AEAD, forward secrecy).
-- **No telemetry, no analytics, no Firebase.**
-- **Glassmorphism UI** — iPhone-style translucent panels with blur.
-- **Rich messages** — bold, italic, strikethrough, spoiler, code, links.
-- **Reactions** — any Unicode emoji.
-- **Files & photos** — up to 64 MB, resumable.
-- **Voice calls** — 16 kHz E2EE with ADPCM+DTX.
-- **Offline delivery** — encrypted outbox with ACKs and dedup.
-- **Account recovery** — a passkey + one core-sealed file in your own
-  cloud (Google Drive, Yandex Disk or any WebDAV server) restores your
-  identity, profile, contacts and routes on a new device; message history
-  is never synced. See [docs/RECOVERY.md](docs/RECOVERY.md).
+---
 
-## Screenshots
+## What Stille is
 
-Generated examples are in [docs/screenshots](docs/screenshots):
+<img align="right" src="docs/assets/stille-owl.svg" width="132" alt="Stille owl mascot">
 
-![Welcome](docs/screenshots/welcome.svg)
-![Chats](docs/screenshots/chats.svg)
-![Chat](docs/screenshots/chat.svg)
-![Settings](docs/screenshots/settings.svg)
+*Stille* is German for “silence”. The messenger connects two devices
+directly — over TCP, LAN discovery or a self-hosted relay — with no
+operator servers in between. The client contains no telemetry, no
+analytics and no third-party SDKs.
 
-Regenerate them with `python3 tools/generate_screenshots.py`. The supplied
-Stille logo is stored at `app/src/main/res/drawable-nodpi/stille_logo.png`.
-Installed-app launcher icons use the supplied minimal density set in
-`app/src/main/res/mipmap-*`, with `ic_launcher.png` and `ic_launcher_round.png`
-names. The 512px source is retained at
-`app/src/main/res/drawable-nodpi/stille_launcher_master.png`; this is not a Play
-Market asset set.
+All cryptography, message storage and transport belong to the
+[core](https://github.com/puxxalwl/stille-messenger-core): a single static
+binary the app runs locally and talks to over a Unix socket. The client
+never touches keys, and nothing is written to disk in plaintext.
 
-## First launch
+## In this client
 
-On the first launch, Stille Messenger opens a local welcome setup where you choose the
-interface language, light/system/dark theme, and the name shown on your profile.
-These choices are stored locally on the device and can be changed later in the
-app settings/profile. Stille can check the public GitHub Releases feed once per
-launch; this can be disabled in Settings while manual checks remain available in
-About Stille. Updates are downloaded only after confirmation and are verified
-(checksum, signing certificate, version) before Android's system installer
-opens automatically — the missing "install unknown apps" permission is
-requested before the download starts, not after it.
+- Chats with formatted messages: bold, italic, strikethrough, spoiler,
+  code, links — over UTF-8 entity ranges, safe for emoji.
+- Reactions with any Unicode emoji.
+- Contacts through one-time or permanent invites: QR with live camera
+  scanning, saved QR images, links and `stille://` deeplinks.
+- Profile with an avatar stored by the core in encrypted form.
+- Account recovery: a passkey plus one core-sealed file in your own cloud
+  restores the identity on a new device — without the message history
+  ([details](docs/RECOVERY.md)).
+- Self-updates: APKs from GitHub Releases, verified by checksum, signing
+  certificate and version before installation.
+- English and Russian interface.
 
+File transfer (up to 64 MB) and 16 kHz E2EE voice calls are defined by
+the core API but not yet implemented in this client.
 
-Stille means “silence” in German. Names are limited to 1–32 UTF-8 bytes, matching
-the core (16 Cyrillic letters or 8 four-byte emoji). Continue stays at the bottom
-while the form scrolls. The Android application ID is now `com.stille.messenger`; this is a separate installation without automatic migration of old data.
+## Architecture
 
-## Navigation
-
-Swipe horizontally between Profile, Chats, Contacts and Settings, or use the
-bottom tabs. Transitions slide smoothly with a subtle motion-blur approximation
-on Android 12+; older devices use slide/scale/fade without blur. Content is sharp
-at rest. Swiping sections is disabled inside conversations and invitation sheets.
-Back from a conversation returns to the section you opened it from.
-
-## Profile photo
-
-In Profile, choose **Set photo** / **Change photo**. The system picker needs no
-broad storage permission. Images up to 8 MiB are processed off-thread: EXIF
-orientation, center square crop, JPEG without metadata, and resizing/compression
-to the core limit of 16,000 bytes. Success is shown only after SET_AVATAR confirms
-the content id and size. Failures keep the previous photo.
-
-Profile, chats and contacts render memory-only images with initials as fallback.
-The cache holds at most 20 images (including your own); peer images require a
-confirmed JOIN. The core stores the uploaded photo encrypted across restarts.
-**Current API limitation:** it has no method to read your own photo bytes back,
-so your own preview is available only while the service process retains it.
-Peer previews depend on AVATAR_RECEIVED; this client does not poll or write a
-plaintext image cache. No camera capture, manual crop editor or remove-photo API
-is implemented.
-
-## Invitations and live QR scanning
-
-Open **Add contact** from Chats or Contacts. The invitation holder displays a
-one-time QR/link; the other device can use **Scan with camera** for in-memory,
-continuous QR decoding or choose a saved image. Camera frames are bounded to a
-single decoder worker, never logged or written to disk, and the camera is
-released when the scanner closes or the app pauses. Invite acceptance tracks the
-core-returned contact id as pending until authenticated presence/JOIN confirms
-it, so two devices using one code do not make the UI trust a provisional name.
-Theme colors now crossfade semantically; tab and conversation transitions are
-short (200 ms for tabs), with the cached GPU motion blur restored from v0.2.2
-on Android 12+; older devices retain slide/scale/fade. After `ACCEPT_INVITE`, the
-UI waits for the authenticated `CONTACT_JOINED` event; simultaneous acceptance
-of one one-time code is serialized by the core and only the first valid JOIN
-can create the connection. Both devices must be on the same LAN for an
-address-less invite, with multicast enabled, or use a reachable address/relay.
-
-## Permanent invite link
-
-Besides the one-time invite, the invitation sheet shows your **permanent
-link** — `https://stille.im/invite/{code}` — which is the persistent
-profile code (`CREATE_INVITE_EX` mode 4, API 2.8.0) with the `stille://`
-scheme stripped. The link **carries the complete invitation itself**:
-deterministically derived from the identity seed, it never burns, does not
-count against the four live one-time invites, and anyone who receives the
-link (messenger, QR, tap) can connect directly — the stille.im site is only
-a redirector and holds no mapping, short code or bundle. **Reset link**
-rotates the profile-code secret (`REGENERATE_PROFILE_CODE`) when it leaks:
-previously shared links stop validating immediately, existing contacts and
-chats are unaffected.
-
-The app is the only handler: a tapped `https://stille.im/invite/i/…` or
-`stille.im/invite/i3/…` link (with or without the `https://` prefix, plain
-`http://` rejected) is reconstructed locally by re-attaching the
-`stille://` scheme and fed straight into `ACCEPT_INVITE` — no network
-round-trip, no server-side state. Direct `stille://i…` invite codes shared
-in messengers open the same flow. The live camera scanner, saved QR images
-and pasted input accept all of these through the same parsing, and invite
-codes never appear in logs.
-
-## Setup
-
-### Prerequisites
-- Android 8.0+ (API 26)
-- JDK 17
-- [Zig 0.17.0](https://ziglang.org/download/) (for building stille-messenger-core)
-
-### Build
-
-```bash
-# 1. Build stille-messenger-core binary for Android arm64-v8a
-bash ./tools/build-core.sh
-
-# 2. Build the Android app
-./gradlew :app:assembleDebug
-
-# 3. (optional) Run tests
-./gradlew :data:testDebugUnitTest :app:testDebugUnitTest
-
-# Fast incremental Kotlin check (keeps Gradle/Kotlin daemons warm)
-./gradlew :app:compileDebugKotlin --daemon --offline --max-workers=2
+```mermaid
+flowchart LR
+    UI["Compose UI"] <-->|"StateFlow"| SVC["StilleService<br/>(foreground)"]
+    SVC <-->|"binary protocol · UDS"| CORE["stille-messenger-core<br/>(libstille.so)"]
+    CORE <-->|"TCP · LAN · relay"| PEER["Peer device"]
 ```
 
-### Release signing and installation
+| Module | Role |
+|---|---|
+| `app/` | Compose UI, foreground service, recovery and update flows |
+| `data/` | Binary protocol codec — mirrors `CORE-API.md` byte-for-byte |
+| `tools/` | Cross-compilation and release scripts |
+| `core-src/` | Core source (git submodule, not a Gradle module) |
 
-Release builds (current version `3.1.1`, versionCode `30`) require a persistent private keystore via `STILLE_KEYSTORE_PATH`,
-`STILLE_STORE_PASSWORD`, `STILLE_KEY_ALIAS`, and `STILLE_KEY_PASSWORD`. Debug
-builds remain independent. Never commit a keystore or paste its contents into logs.
-
-GitHub Actions requires secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`,
-`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, plus repository variable
-`ANDROID_SIGNING_CERT_SHA256` (public certificate SHA-256, 64 hex characters).
-The workflow verifies the APK signature, pinned certificate, ZIP integrity and
-alignment before publication. Missing configuration stops a release; it never
-falls back to a newly generated debug key.
-
-Published v0.2.3 and v0.2.4 used different ephemeral runner keys: both APKs verify,
-but Android cannot install one over the other. Updating an existing installation
-requires its original private signing key; the APK contains only the public
-certificate. Do not uninstall or clear app data to troubleshoot: identity and
-history may be lost. A new permanent key fixes future continuity, not old installs.
-
-For the protected local key layout (`~/.local/share/stille-signing/release.p12`
-and `release.password`, alias `stille-release`), run:
-
-```bash
-python3 tools/build-signed-release.py --offline
-```
-
-Keep the directory private (700), files private (600), and a secure backup of
-both outside this repository. The helper never regenerates a missing key and
-turns off Gradle configuration caching for signing. Local builds use one worker,
-a 1536 MiB Gradle heap and in-process Kotlin compilation to avoid two oversized JVMs.
-Git SSH access alone cannot
-configure GitHub Actions secrets; that requires repository Secrets write access.
-
-### Architecture
-
-```
-app/                      # Android app: Compose UI + foreground service
-├── ui/                   # Compose screens, components, theme
-├── service/              # StilleService (foreground) + BootReceiver
-data/                     # Protocol codec (matches CORE-API.md byte-for-byte)
-tools/                    # Cross-compile scripts for stille-messenger-core
-core-src/                 # stille-messenger-core source (git submodule / cloned)
-```
-
-The `data` module implements the binary UDS protocol codec. The
-`StilleService` foreground service:
-1. Uses `libstille.so` from Android's installed `nativeLibraryDir` (an executable, not JNI)
-2. Creates the local core identity once with `stille-messenger-core init`, never overwriting an existing seed (or starts unprovisioned in recovery mode)
-3. Starts `stille-messenger-core serve` and connects to `~/.stille-messenger/api.sock` (UDS)
-4. Sends `GET_VERSION` to verify core compatibility
-5. Listens for events and broadcasts them to the UI via `StateFlow`
-
-If invites or profile photo actions say that the local core is unavailable,
-rebuild the APK after `bash ./tools/build-core.sh`. The APK must contain
-`lib/arm64-v8a/libstille.so`, generated from
-`app/src/main/jniLibs/arm64-v8a/libstille.so` (ignored by Git).
-Packaging enables native extraction: Android 10+ blocks execution from writable
-app data, so an asset copied into `filesDir` cannot be used. APK packaging fails
-if the AArch64 core is missing; Kotlin-only checks need no binary. Profile and
-invite screens offer a retry action. Startup logs contain only fixed stages and
-exception types, never core output or identities. A redacted diagnostics log
-file (stages, error types; no messages, contacts or secrets) can be shared
-from Settings by tapping "About Stille" five times quickly. Install the updated APK over
-the existing app; do not clear data to troubleshoot startup.
-
-### Adding a friend
-
-Open the invite action from Chats or Contacts. Stille creates a one-time invite
-through the binary `CREATE_INVITE` API and keeps it in memory only. You can share
-the link, copy it, or show a black-and-white QR with the symbol-only Stille mark
-(no wordmark). The recipient can paste the link or choose a QR image; Stille
-accepts it through `ACCEPT_INVITE` and shows the contact only after the trusted
-`CONTACT_JOINED` event.
-
-```
-A: CREATE_INVITE → "stille://i/ABC123..."
-   (share over any messenger or QR)
-B: ACCEPT_INVITE → wait for CONTACT_JOINED → connected
-```
+The service executes the core binary from `nativeLibraryDir`, provisions
+the identity once, then forwards core events to the UI as `StateFlow`.
+[How the client works](docs/ARCHITECTURE.md).
 
 ## Documentation
 
 | Document | Content |
 |---|---|
-| [AGENTS.md](AGENTS.md) | Contributor contract for the Android client |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
-| [DOCS.md](DOCS.md) | Documentation writing rules |
+| [docs/USAGE.md](docs/USAGE.md) | Using the app: setup, invitations, profile, updates |
+| [docs/BUILD.md](docs/BUILD.md) | Building, testing, signing and publishing releases |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Client internals and the core boundary |
+| [docs/RECOVERY.md](docs/RECOVERY.md) | Account recovery ceremony and storage providers |
+| [docs/UI-DESIGN.md](docs/UI-DESIGN.md) | UI direction for contributors |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution rules |
 | [SECURITY.md](SECURITY.md) | Security policy |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
 
-For the core API specification, see:
-[`core-src/zig/docs/CORE-API.md`](core-src/zig/docs/CORE-API.md) or the
-upstream [stille-messenger-core](https://github.com/puxxalwl/stille-messenger-core).
+The wire protocol is specified in the core repository:
+[`core-src/core/docs/CORE-API.md`](core-src/core/docs/CORE-API.md).
 
-## Linux client
+## Build
 
-The official Linux desktop client is [EryyynIT/shopot](https://github.com/EryyynIT/shopot).
-It is built with Rust and iced, uses the same core daemon and binary
-UDS API, and is the reference desktop client for cross-platform UX and
-integration behavior. This Android project shares the core contract but does
-not copy Linux client source code.
+Requires JDK 17, the Android SDK and [Zig 0.17.0](https://ziglang.org/download/)
+(only for cross-compiling the core). Output is an `arm64-v8a` APK.
+
+```bash
+bash ./tools/build-core.sh     # core → app/src/main/jniLibs/arm64-v8a/libstille.so
+./gradlew :app:assembleDebug   # the app
+./gradlew :data:testDebugUnitTest :app:testDebugUnitTest   # tests
+```
+
+Release builds need a signing keystore — see [docs/BUILD.md](docs/BUILD.md).
+
+## Project family
+
+| Project | Role |
+|---|---|
+| [stille-messenger-core](https://github.com/puxxalwl/stille-messenger-core) | Zig daemon: crypto, storage, transport |
+| Stille Messenger (this repo) | Android client |
+| [EryyynIT/shopot](https://github.com/EryyynIT/shopot) | Linux reference client, Rust + iced |
+| [stille.im](https://stille.im) | Website — the invite domain is a redirector only |
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR — it lists the
+invariants reviewers enforce (no telemetry, no client-side crypto, binary
+protocol only). Contributor contract for agents and humans:
+[AGENTS.md](AGENTS.md).
 
 ## License
 
-The original Android client code is licensed under **AGPL-3.0-or-later**.
-All forks, modified versions, and redistributions of covered work must use the
-same license and retain attribution to `puxxalwl` and `EryyynIT`. See
-[LICENSE](LICENSE), [LICENSE-AGPL-3.0.txt](LICENSE-AGPL-3.0.txt), and
-[NOTICE](NOTICE).
-
-The `core-src/` submodule is an independent stille-messenger-core project and retains
-its upstream MIT license. The Linux client [EryyynIT/shopot](https://github.com/EryyynIT/shopot)
-is referenced for UX/integration and is not copied into this repository.
+Original Android client code: **AGPL-3.0-or-later**, Copyright (c) 2026
+puxxalwl, EryyynIT. Forks and redistributions keep the same license and
+attribution. See [LICENSE](LICENSE), [NOTICE](NOTICE) and the full text in
+[LICENSE-AGPL-3.0.txt](LICENSE-AGPL-3.0.txt). The `core-src/` submodule is
+an independent project under its own MIT license.

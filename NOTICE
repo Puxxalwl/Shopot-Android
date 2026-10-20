@@ -7,10 +7,11 @@ AGPL-3.0-or-later. Forks, modified versions, and redistributions of that
 covered work must preserve the same license and both copyright holders.
 
 The `core-src/` path is a git submodule from:
-  https://github.com/puxxalwl/shopot-core
-It is a separate work and remains under the license declared by shopot-core
-(currently MIT, Copyright (c) 2026 puxxalwl, EryyynIT). Do not remove or
-replace that submodule's license when redistributing this repository.
+  https://github.com/puxxalwl/stille-messenger-core
+It is a separate work and remains under the license declared by
+stille-messenger-core (currently MIT, Copyright (c) 2026 puxxalwl,
+EryyynIT). Do not remove or replace that submodule's license when
+redistributing this repository.
 
 The Linux reference client is:
   https://github.com/EryyynIT/shopot

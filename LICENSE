@@ -8,6 +8,7 @@ All copies, forks, modified versions, and redistributions of covered work
 must remain under the same license and retain this copyright notice.
 
 The `core-src/` git submodule is an independent upstream project and remains
-under the license stated by shopot-core in its own repository. See NOTICE.
+under the license stated by stille-messenger-core in its own repository. See
+NOTICE.
 
 The complete license text is provided in LICENSE-AGPL-3.0.txt.
