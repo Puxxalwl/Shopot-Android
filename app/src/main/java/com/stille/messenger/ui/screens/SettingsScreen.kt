@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.stille.messenger.BuildConfig
+import com.stille.messenger.diag.RapidTapCounter
 import com.stille.messenger.ui.components.GlassSurface
 import com.stille.messenger.ui.components.ScreenTitle
 import com.stille.messenger.ui.components.SegmentedChoice
@@ -48,6 +49,10 @@ fun SettingsScreen(
 ) {
     val english = language == "en"
     var about by rememberSaveable { mutableStateOf(false) }
+    var diagnostics by rememberSaveable { mutableStateOf(false) }
+    // Hidden diagnostics entry: five rapid taps on "About Stille" open the
+    // redacted log file instead of the About dialog.
+    val aboutTaps = remember { RapidTapCounter() }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { ScreenTitle(if (english) "Settings" else "Настройки") }
         item {
@@ -91,7 +96,15 @@ fun SettingsScreen(
                     }
                     HorizontalDivider(Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                     Row(
-                        Modifier.fillMaxWidth().clickable { about = true; onAboutOpened() }.heightIn(min = 64.dp).padding(16.dp),
+                        Modifier.fillMaxWidth().clickable {
+                            if (aboutTaps.tap()) {
+                                about = false
+                                diagnostics = true
+                            } else {
+                                about = true
+                                onAboutOpened()
+                            }
+                        }.heightIn(min = 64.dp).padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -130,4 +143,5 @@ fun SettingsScreen(
         },
         confirmButton = { TextButton(onClick = { about = false }) { Text(if (english) "Done" else "Готово") } }
     )
+    if (diagnostics) DiagnosticsDialog(english = english, onDismiss = { diagnostics = false })
 }

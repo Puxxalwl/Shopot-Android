@@ -31,6 +31,7 @@ import com.stille.coreapi.InviteExMode
 import com.stille.coreapi.InviteLifecycleState
 import com.stille.coreapi.status
 import com.stille.messenger.R
+import com.stille.messenger.diag.StilleLog
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -449,10 +450,12 @@ class StilleService : Service() {
                     lastError = e
                     // Fixed stage and exception type only: no paths, identity or core output.
                     android.util.Log.w("StilleService", "Core startup: $stage (${e.javaClass.simpleName})")
+                    StilleLog.e("service", "core-startup-failed", e, "stage=$stage attempt=$attempt")
                     cleanupCoreRuntime()
                     if (attempt + 1 < CORE_START_ATTEMPTS) delay(CORE_RETRY_DELAY_MS)
                 }
             }
+            StilleLog.e("service", "core-unavailable")
             _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
             _events.emit(CoreEvent.Error("Core unavailable: ${lastError?.javaClass?.simpleName ?: "startup failed"}"))
         }
@@ -549,6 +552,7 @@ class StilleService : Service() {
             if (version.major != 2) throw ProtocolException("incompatible core major version")
             apiVersion = version
             android.util.Log.i("StilleService", "Core version: ${version.major}.${version.minor}.${version.patch}")
+            StilleLog.i("service", "core-connected", "api=${version.major}.${version.minor}.${version.patch}")
 
             val contacts = if (version.minor >= 7) {
                 sendRequest(Method.SUBSCRIBE_CONTACT_UPDATES, Requests.subscribeContactUpdates())
@@ -737,6 +741,7 @@ class StilleService : Service() {
                 // Add CALL_STATE (5), BLOCKED_BY_PEER (10) as needed
                 else -> {
                     android.util.Log.d("StilleService", "Unhandled event id=$eventId, payloadLen=${payload.size}")
+                    StilleLog.w("service", "unhandled-event", "id=$eventId len=${payload.size}")
                 }
             }
     }

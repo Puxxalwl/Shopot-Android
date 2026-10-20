@@ -47,6 +47,16 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/updates_paths" />
         </provider>
 
+        <!-- Read-only sharing of the redacted diagnostics log (five rapid
+             taps on "About Stille" in Settings). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.logs"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/logs_paths" />
+        </provider>
+
         <receiver android:name=".service.BootReceiver"
             android:exported="false">
             <intent-filter>
