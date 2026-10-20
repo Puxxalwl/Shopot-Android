@@ -3,23 +3,28 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [3.2.0]
+
+### Changed
+- Core submodule updated to the `stille-messenger-core` rename: the data
+  directory moved from `~/.shopot` to `~/.stille-messenger` (the core
+  migrates it atomically on first start — existing installs keep their
+  identity, contacts and history), the UDS socket is now
+  `~/.stille-messenger/api.sock`, and new invites use the canonical
+  `stille://i/…` / `stille://i3/…` codes. The client follows all three
+  changes and still accepts legacy `shopot://` and `shopot1.` codes, both
+  scanned and pasted.
+- Event-driven LAN detect and immediate dial from the updated core: a
+  message to an offline peer now triggers a dial job plus a burst
+  discovery announcement right away instead of waiting for background
+  cycles (no client protocol change; multicast lock behavior unchanged).
 
 ### Fixed
-- Live QR invitation scanner: the camera permission is now requested as soon
-  as the scanner opens instead of showing a black screen; `Camera.open()` and
-  preview configuration moved off the main thread onto a dedicated worker
-  with one automatic retry; the overlay no longer relies on dialog insets
-  that resolve to zero with `decorFitsSystemWindows=false`, so the frame and
-  buttons align on all devices.
-- Google Drive recovery consent is now launched interactively: when the
-  account manager returns a consent intent, the client opens Google's screen
-  and retries the interrupted enable/restore/delete automatically.
-- In-app updates install themselves: the "install unknown apps" permission is
-  requested *before* the APK download starts (previously the whole 50 MiB was
-  downloaded and only then failed), the download resumes automatically when
-  the user returns from the permission screen, and Android's install
-  confirmation opens by itself once the verified download is ready.
+- CI: test function names containing dots failed Kotlin compilation once
+  the build cache missed; renamed to keep `:data:testDebugUnitTest`
+  compiling.
+- The QR scanner now also accepts `shopot://i3/` hybrid codes (it
+  previously matched only `shopot://i/` and `shopot1.`).
 
 ### Added
 - Recovery backup storage providers beyond Google Drive, with no new
@@ -33,6 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   only — never messages, contacts, invite codes or keys). Open it from
   Settings by tapping "About Stille" five times quickly, then share or clear
   it; uncaught exceptions are recorded there too.
+- Live QR invitation scanner: the camera permission is now requested as
+  soon as the scanner opens instead of showing a black screen; `Camera.open()`
+  and preview configuration moved off the main thread onto a dedicated
+  worker with one automatic retry; the overlay insets itself from
+  `safeDrawing` so the frame and buttons align on all devices.
+- Google Drive recovery consent is now launched interactively: when the
+  account manager returns a consent intent, the client opens Google's
+  screen and retries the interrupted enable/restore/delete automatically.
+- In-app updates install themselves: the "install unknown apps" permission
+  is requested *before* the APK download starts (previously the whole
+  50 MiB was downloaded and only then failed), the download resumes
+  automatically when the user returns from the permission screen, and
+  Android's install confirmation opens by itself once the verified
+  download is ready.
 
 ## [3.1.1]
 
