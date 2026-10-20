@@ -12,6 +12,7 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import com.stille.messenger.diag.StilleLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.ensureActive
@@ -24,6 +25,8 @@ sealed class DownloadState {
     data object Idle : DownloadState()
     data class Running(val received: Long, val total: Long?) : DownloadState()
     data class Ready(val file: File) : DownloadState()
+    /** Install permission is missing: the UI must open Android's settings. */
+    data object NeedInstallPermission : DownloadState()
     data class Error(val message: String) : DownloadState()
 }
 data class UpdateUiState(val result: UpdateResult? = null, val checking: Boolean = false, val download: DownloadState = DownloadState.Idle, val showSheet: Boolean = false, val checkedThisLaunch: Boolean = false)
@@ -54,6 +57,7 @@ class UpdateController : ViewModel() {
             val result = withContext(Dispatchers.IO) { checker.check() }
             val allowAuto = autoEnabled
             val dismissed = mutableState.value.showSheet
+            StilleLog.i("update", "check-complete", "result=${result.javaClass.simpleName}")
             mutableState.value = mutableState.value.copy(result = result, checking = false,
                 checkedThisLaunch = mutableState.value.checkedThisLaunch || !manual,
                 showSheet = allowAuto && !manual && !dismissed && result is UpdateResult.Available)
@@ -63,9 +67,18 @@ class UpdateController : ViewModel() {
     fun startDownload(context: Context) {
         val release = (mutableState.value.result as? UpdateResult.Available)?.release ?: return
         if (downloadJob?.isActive == true) return
+        // Fail fast: ask for the install permission before spending the user's
+        // data on a 50 MiB download that could never be installed.
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            StilleLog.w("update", "install-permission-missing")
+            mutableState.value = mutableState.value.copy(download = DownloadState.NeedInstallPermission)
+            return
+        }
         downloadJob = viewModelScope.launch {
+            StilleLog.i("update", "download-started", "version=${release.version}")
             mutableState.value = mutableState.value.copy(download = DownloadState.Running(0, release.size))
             val result = withContext(Dispatchers.IO) { download(context, release) }
+            StilleLog.i("update", "download-finished", "result=${result.javaClass.simpleName}")
             mutableState.value = mutableState.value.copy(download = result)
         }
     }
@@ -123,9 +136,13 @@ class UpdateController : ViewModel() {
             check(apkInfo.longVersionCode > installed.longVersionCode) { "APK is not newer than installed version" }
             check(apkInfo.applicationInfo?.minSdkVersion?.let { Build.VERSION.SDK_INT >= it } != false) { "Android version is too old" }
             check(temp.renameTo(target)) { "Could not finalize APK" }
+            StilleLog.i("update", "download-verified", "bytes=$received")
             return DownloadState.Ready(target)
         } catch (e: kotlinx.coroutines.CancellationException) { temp.delete(); throw e }
-        catch (e: Exception) { temp.delete(); return DownloadState.Error(e.message ?: "Download failed") }
+        catch (e: Exception) {
+            StilleLog.e("update", "download-failed", e)
+            temp.delete(); return DownloadState.Error(e.message ?: "Download failed")
+        }
         finally { connection?.disconnect() }
     }
     companion object { const val MAX_APK_BYTES = 50L * 1024 * 1024 }

@@ -132,9 +132,17 @@ fun SettingsScreen(
                 if (downloadState is DownloadState.Running) {
                     val progress = downloadState.received.toFloat() / (downloadState.total ?: 1L).toFloat()
                     LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, Modifier.fillMaxWidth())
+                    Text(if (english) "Downloading the update…" else "Загружаем обновление…")
                     TextButton(onClick = onCancelDownload) { Text(if (english) "Cancel" else "Отменить") }
+                } else if (downloadState is DownloadState.NeedInstallPermission) {
+                    Text(if (english) "Allow installs from Stille in Android settings, then return — the download continues automatically." else "Разрешите установку из Stille в настройках Android и вернитесь — загрузка продолжится сама.")
+                    Button(onClick = onUpdateDownload) { Text(if (english) "Open settings" else "Открыть настройки") }
                 } else if (downloadState is DownloadState.Ready) {
-                    Text(if (english) "Download complete. Tap Update again to install." else "Загрузка завершена. Нажмите «Обновить» ещё раз для установки.")
+                    Text(if (english) "Download complete. Android's install confirmation opens next." else "Загрузка завершена. Сейчас откроется подтверждение установки Android.")
+                    Button(onClick = onUpdateDownload) { Text(if (english) "Install update" else "Установить обновление") }
+                } else if (downloadState is DownloadState.Error) {
+                    Text(if (english) "Update failed: ${downloadState.message}" else "Не удалось обновить: ${downloadState.message}", color = MaterialTheme.colorScheme.error)
+                    Button(onClick = onUpdateDownload) { Text(if (english) "Retry" else "Повторить") }
                 } else if (updateResult is UpdateResult.Available) {
                     Button(onClick = onUpdateDownload) { Text(if (english) "Update" else "Обновить") }
                 }

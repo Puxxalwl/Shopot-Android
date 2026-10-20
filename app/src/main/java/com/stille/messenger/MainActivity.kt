@@ -66,6 +66,13 @@ import com.stille.messenger.update.UpdateController
 import com.stille.messenger.update.UpdateResult
 import com.stille.messenger.update.DownloadState
 import com.stille.messenger.update.installUpdate
+import com.stille.messenger.diag.StilleLog
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 
 class MainActivity : ComponentActivity() {
     private val updates: UpdateController by viewModels()
@@ -211,6 +218,45 @@ fun StilleApp(
     androidx.compose.runtime.LaunchedEffect(updateState.showSheet, showInvite, currentChatCid, showUpdateSheet) {
         if (updateState.showSheet && !showInvite && currentChatCid == null && !showUpdateSheet) showUpdateSheet = true
     }
+
+    // The update flow drives itself: permission screen when needed, and the
+    // Android installer as soon as the verified download is ready. The user
+    // only confirms the install (a platform requirement, not a design choice).
+    androidx.compose.runtime.LaunchedEffect(updateState.download) {
+        val host = activity ?: return@LaunchedEffect
+        when (val download = updateState.download) {
+            is DownloadState.Ready -> {
+                StilleLog.i("update", "installer-launched")
+                try { host.startActivity(installUpdate(host, download.file)) }
+                catch (error: Exception) { StilleLog.e("update", "installer-launch-failed", error) }
+            }
+            DownloadState.NeedInstallPermission -> {
+                host.startActivity(
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${host.packageName}"))
+                )
+            }
+            else -> Unit
+        }
+    }
+
+    // Returning from the install-permission screen resumes the download once
+    // the permission is actually granted; nothing loops while it is not.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner, updates) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val host = activity
+                if (host != null && updates != null &&
+                    updates.state.value.download is DownloadState.NeedInstallPermission &&
+                    host.packageManager.canRequestPackageInstalls()
+                ) {
+                    updates.startDownload(host)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val currentMessages = currentChatCid?.let { chatsState.chatMessages[it] ?: emptyList() } ?: emptyList()
     var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
     androidx.activity.compose.BackHandler(enabled = currentChatCid != null) { currentChatCid = null }
@@ -228,7 +274,25 @@ fun StilleApp(
         val release = (updateState.result as? UpdateResult.Available)?.release
         if (release != null) com.stille.messenger.ui.screens.UpdateSheet(
             release = release, english = isEnglish,
-            onUpdate = { showUpdateSheet = false; activity?.let { host -> if (host.packageManager.canRequestPackageInstalls()) updates?.startDownload(host) else host.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:${host.packageName}"))) } },
+            downloadState = updateState.download,
+            onUpdate = {
+                val host = activity
+                if (host != null) {
+                    when (updateState.download) {
+                        is DownloadState.Ready -> {
+                            try { host.startActivity(installUpdate(host, (updateState.download as DownloadState.Ready).file)) }
+                            catch (_: Exception) { }
+                        }
+                        DownloadState.NeedInstallPermission -> {
+                            host.startActivity(
+                                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${host.packageName}"))
+                            )
+                        }
+                        else -> updates?.startDownload(host)
+                    }
+                }
+            },
+            onCancelDownload = onCancelUpdateDownload,
             onLater = { showUpdateSheet = false; updates?.dismissSheet() }
         )
     }
@@ -308,10 +372,18 @@ fun StilleApp(
                     onUpdateDownload = {
                         val host = activity
                         if (host != null) {
-                            if (updateState.download is DownloadState.Ready) {
-                                try { host.startActivity(installUpdate(host, (updateState.download as DownloadState.Ready).file)) }
-                                catch (_: Exception) { }
-                            } else onStartUpdateDownload(host)
+                            when (updateState.download) {
+                                is DownloadState.Ready -> {
+                                    try { host.startActivity(installUpdate(host, (updateState.download as DownloadState.Ready).file)) }
+                                    catch (_: Exception) { }
+                                }
+                                DownloadState.NeedInstallPermission -> {
+                                    host.startActivity(
+                                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${host.packageName}"))
+                                    )
+                                }
+                                else -> onStartUpdateDownload(host)
+                            }
                         }
                     },
                     onCancelDownload = onCancelUpdateDownload,
