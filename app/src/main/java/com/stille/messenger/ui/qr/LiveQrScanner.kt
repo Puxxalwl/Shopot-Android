@@ -20,16 +20,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +43,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,7 +69,10 @@ import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
 import com.google.zxing.PlanarYUVLuminanceSource
+import com.stille.messenger.diag.StilleLog
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
@@ -101,10 +110,39 @@ fun LiveQrScanner(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> permissionResult = granted }
+
+    // Coming back from the app-details screen: pick up a granted permission.
+    val detailsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            permissionResult = true
+        }
+    }
+
+    fun openApplicationSettings() {
+        detailsLauncher.launch(
+            android.content.Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.fromParts("package", context.packageName, null),
+            )
+        )
+    }
+
     val permissionGranted = permissionResult
         ?: (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     val permanentlyDenied = permissionResult == false && context is Activity &&
         !ActivityCompat.shouldShowRequestPermissionRationale(context, Manifest.permission.CAMERA)
+
+    // Ask for the camera as soon as the scanner opens instead of showing a
+    // black screen and waiting for the user to find the "allow" button.
+    LaunchedEffect(hasCamera, permissionResult) {
+        if (hasCamera && permissionResult == null &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onClose,
@@ -128,7 +166,9 @@ fun LiveQrScanner(
                     permanentlyDenied = permanentlyDenied,
                     onRequest = {
                         if (!permanentlyDenied) permissionLauncher.launch(Manifest.permission.CAMERA)
+                        else openApplicationSettings()
                     },
+                    onOpenSettings = ::openApplicationSettings,
                     onClose = onClose,
                     english = english,
                 )
@@ -197,8 +237,14 @@ private fun ScannerOverlay(
     onPhotoImport: (() -> Unit)?,
 ) {
     Box(Modifier.fillMaxSize()) {
+        // Dialog windows with decorFitsSystemWindows(false) do not reliably
+        // feed Compose the status/navigation bar paddings, so the overlay
+        // insets itself from safeDrawing with generous bottom padding as a
+        // fallback — the controls can never slide under system bars.
         Row(
-            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp),
+            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -239,7 +285,9 @@ private fun ScannerOverlay(
         }
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 24.dp, vertical = 24.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -254,9 +302,9 @@ private fun ScannerOverlay(
             )
             if (onPhotoImport != null) {
                 Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = onPhotoImport) {
+                OutlinedButton(onClick = onPhotoImport, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.PhotoLibrary, null, Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(if (english) "Choose an image" else "Выбрать изображение")
                 }
             }
@@ -268,11 +316,12 @@ private fun ScannerOverlay(
 private fun PermissionMessage(
     permanentlyDenied: Boolean,
     onRequest: () -> Unit,
+    onOpenSettings: () -> Unit,
     onClose: () -> Unit,
     english: Boolean,
 ) {
     Column(
-        modifier = Modifier.padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -296,11 +345,20 @@ private fun PermissionMessage(
             style = MaterialTheme.typography.bodyMedium,
         )
         Spacer(Modifier.height(24.dp))
-        if (!permanentlyDenied) {
-            Button(onClick = onRequest) { Text(if (english) "Allow camera" else "Разрешить камеру") }
+        if (permanentlyDenied) {
+            Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.Settings, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (english) "Open settings" else "Открыть настройки")
+            }
+            Spacer(Modifier.height(8.dp))
+        } else {
+            Button(onClick = onRequest, modifier = Modifier.fillMaxWidth()) {
+                Text(if (english) "Allow camera" else "Разрешить камеру")
+            }
             Spacer(Modifier.height(8.dp))
         }
-        OutlinedButton(onClick = onClose) { Text(if (english) "Close" else "Закрыть") }
+        OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(if (english) "Close" else "Закрыть") }
     }
 }
 
@@ -313,7 +371,7 @@ private fun ScannerMessage(
     onRetry: (() -> Unit)? = null,
 ) {
     Column(
-        modifier = Modifier.padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -322,10 +380,10 @@ private fun ScannerMessage(
         Text(body, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(24.dp))
         if (onRetry != null) {
-            Button(onClick = onRetry) { Text(if (english) "Try again" else "Повторить") }
+            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text(if (english) "Try again" else "Повторить") }
             Spacer(Modifier.height(8.dp))
         }
-        OutlinedButton(onClick = onClose) { Text(if (english) "Close" else "Закрыть") }
+        OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(if (english) "Close" else "Закрыть") }
     }
 }
 
@@ -337,10 +395,11 @@ private class LiveQrCameraView(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val disposed = AtomicBoolean(false)
     private val paused = AtomicBoolean(false)
+    private val opening = AtomicBoolean(false)
     private val callbackEnabled = AtomicBoolean(false)
     private val decodeInFlight = AtomicBoolean(false)
     private val delivered = AtomicBoolean(false)
-    private val decoder = ThreadPoolExecutor(
+    private val decoder: ExecutorService = ThreadPoolExecutor(
         1,
         1,
         0L,
@@ -348,6 +407,11 @@ private class LiveQrCameraView(
         ArrayBlockingQueue(1),
         ThreadFactory { runnable -> Thread(runnable, "stille-qr-decoder").apply { isDaemon = true } },
         ThreadPoolExecutor.AbortPolicy(),
+    )
+    // Camera.open() can take hundreds of milliseconds and must never run on
+    // the main thread; one dedicated opener serializes that work.
+    private val cameraOpener: ExecutorService = Executors.newSingleThreadExecutor(
+        ThreadFactory { runnable -> Thread(runnable, "stille-qr-camera").apply { isDaemon = true } },
     )
     private var camera: Camera? = null
     private var previewWidth = 0
@@ -396,23 +460,61 @@ private class LiveQrCameraView(
         paused.set(true)
         stopCamera()
         decoder.shutdownNow()
+        cameraOpener.shutdownNow()
         mainHandler.removeCallbacksAndMessages(null)
     }
 
     private fun startCamera() {
-        if (disposed.get() || paused.get() || !surfaceReady || camera != null) return
-        val opened: Camera
-        try {
-            val id = backCameraId() ?: throw IllegalStateException("No camera")
-            opened = Camera.open(id)
-            try {
-                configureCamera(opened, id)
-            } catch (error: Exception) {
-                try { opened.release() } catch (_: RuntimeException) { }
-                throw error
+        if (disposed.get() || paused.get() || !surfaceReady || camera != null || !opening.compareAndSet(false, true)) return
+        cameraOpener.execute {
+            var opened: Camera? = null
+            var lastError: Exception? = null
+            // Camera.open occasionally fails once right after another app
+            // releases the sensor; one quiet retry avoids a dead black screen.
+            for (attempt in 0 until OPEN_ATTEMPTS) {
+                try {
+                    opened = openAndConfigure()
+                    lastError = null
+                    break
+                } catch (error: Exception) {
+                    lastError = error
+                    try { Thread.sleep(CAMERA_RETRY_DELAY_MS) } catch (_: InterruptedException) { }
+                }
             }
-        } catch (_: Exception) {
-            onErrorOnMain()
+            val result = opened
+            mainHandler.post {
+                if (result == null) {
+                    StilleLog.e("qr", "camera-open-failed", lastError)
+                    opening.set(false)
+                    onErrorOnMain()
+                } else {
+                    attachPreview(result)
+                }
+            }
+        }
+    }
+
+    /** Opens and configures the back camera on the opener thread. */
+    private fun openAndConfigure(): Camera {
+        val id = backCameraId() ?: throw IllegalStateException("No camera")
+        val opened = Camera.open(id)
+        try {
+            configureCamera(opened, id)
+            return opened
+        } catch (error: Exception) {
+            try { opened.release() } catch (_: RuntimeException) { }
+            throw error
+        }
+    }
+
+    /**
+     * Must run on the main thread: binds the opened camera to the surface and
+     * starts the preview. Takes ownership of [opened]; releases it on failure.
+     */
+    private fun attachPreview(opened: Camera) {
+        if (disposed.get() || paused.get() || !surfaceReady) {
+            opening.set(false)
+            try { opened.release() } catch (_: RuntimeException) { }
             return
         }
         try {
@@ -421,11 +523,15 @@ private class LiveQrCameraView(
             opened.addCallbackBuffer(ByteArray(previewBufferSize()))
             camera = opened
             callbackEnabled.set(true)
+            opening.set(false)
             opened.startPreview()
-        } catch (_: Exception) {
+            StilleLog.i("qr", "camera-preview-started", "size=${previewWidth}x${previewHeight}")
+        } catch (error: Exception) {
+            opening.set(false)
             callbackEnabled.set(false)
-            try { opened.setPreviewCallbackWithBuffer(null) } catch (_: Exception) { }
-            try { opened.release() } catch (_: Exception) { }
+            try { opened.setPreviewCallbackWithBuffer(null) } catch (_: RuntimeException) { }
+            try { opened.release() } catch (_: RuntimeException) { }
+            StilleLog.e("qr", "camera-attach-failed", error)
             onErrorOnMain()
         }
     }
@@ -483,6 +589,7 @@ private class LiveQrCameraView(
                     if (invite != null && isValidInvite(invite!!) && delivered.compareAndSet(false, true)) {
                         mainHandler.post {
                             if (!disposed.get()) {
+                                StilleLog.i("qr", "scan-complete")
                                 stopCamera()
                                 onDecoded(invite!!)
                             }
@@ -561,6 +668,11 @@ private class LiveQrCameraView(
     ): Result = reader.decode(BinaryBitmap(HybridBinarizer(source)), hints)
 
     private fun isValidInvite(value: String): Boolean = isStilleInvite(value)
+
+    private companion object {
+        const val OPEN_ATTEMPTS = 2
+        const val CAMERA_RETRY_DELAY_MS = 250L
+    }
 }
 
 /** Shape-only validation; core remains the authority on invite validity. */
