@@ -208,7 +208,7 @@ class StilleProtocolTest {
     }
 
     @Test
-    fun `api 2.7 invitation and bootstrap payloads decode`() {
+    fun `api 2_7 invitation and bootstrap payloads decode`() {
         val inviteId = ByteArray(16) { 4 }
         val invitePayload = FrameBuffer().apply { writeStr16("shopot://i3/test"); writeBytes(inviteId) }.toByteArray()
         val invite = Responses.decodeCreateInviteEx(invitePayload)
@@ -239,7 +239,7 @@ class StilleProtocolTest {
     }
 
     @Test
-    fun `api 2.7 request encoders use exact layouts`() {
+    fun `api 2_7 request encoders use exact layouts`() {
         val request = Requests.createInviteEx(InviteExMode.DIRECT, "A", "10.0.0.1:7777")
         val r = FrameReader(request)
         assertEquals(1, r.readU8()); assertEquals("A", r.readStr16()); assertEquals("10.0.0.1:7777", r.readStr16()); assertEquals("", r.readStr16())
