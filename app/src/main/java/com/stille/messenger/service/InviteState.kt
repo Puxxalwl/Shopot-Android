@@ -19,6 +19,9 @@ enum class InviteError {
     DISCOVERY_DISABLED, TRANSPORT_FAILED, RELAY_UNAVAILABLE, TOR_UNAVAILABLE, REQUEST_FAILED
 }
 
+/** Invite code prefixes: the core emits stille:// (v2/v3) and still accepts legacy shopot:// and shopot1. */
+internal val INVITE_PREFIXES = listOf("stille://i/", "stille://i3/", "shopot://i/", "shopot://i3/", "shopot1.")
+
 internal fun validInviteInput(value: String): Boolean =
-    value.length in 10..4096 && (value.startsWith("shopot://i/") || value.startsWith("shopot://i3/") || value.startsWith("shopot1.")) &&
+    value.length in 10..4096 && INVITE_PREFIXES.any { value.startsWith(it) } &&
         value.none { it.isWhitespace() || it.isISOControl() }

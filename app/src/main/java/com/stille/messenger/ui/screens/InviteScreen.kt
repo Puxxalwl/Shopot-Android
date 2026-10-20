@@ -148,7 +148,7 @@ fun InviteSheet(state: InviteState, onCreate: () -> Unit, onAccept: (String) -> 
                 if (scanning) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (scanError) Text(if (english) "No Stille invitation found in this image" else "На изображении не найдено приглашение Stille", color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(input, { if (it.length <= 4096) input = it }, Modifier.fillMaxWidth(), label = { Text(if (english) "Invitation link" else "Ссылка-приглашение") }, placeholder = { Text("shopot://i/…") }, minLines = 2, maxLines = 4, shape = RoundedCornerShape(20.dp))
+                OutlinedTextField(input, { if (it.length <= 4096) input = it }, Modifier.fillMaxWidth(), label = { Text(if (english) "Invitation link" else "Ссылка-приглашение") }, placeholder = { Text("stille://i/…") }, minLines = 2, maxLines = 4, shape = RoundedCornerShape(20.dp))
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { onAccept(input); input = "" }, enabled = input.isNotBlank() && state.ready && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoundedCornerShape(18.dp)) {
                     Text(if (english) "Connect" else "Подключиться")

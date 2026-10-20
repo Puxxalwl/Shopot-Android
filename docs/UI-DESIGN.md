@@ -30,7 +30,7 @@ The interface borrows iPhone's hierarchy, not platform-specific assets or expens
 
 ## Invitations and QR
 
-Invitations use the existing binary `CREATE_INVITE` and `ACCEPT_INVITE` methods. The client keeps codes in memory only, reuses one live code instead of exhausting the core's maximum of four live invites, and waits for `CONTACT_JOINED` before exposing the new contact. The invitation sheet supports copy, Android share, and selecting a QR image. A selected image is decoded in memory; its content is accepted only when it is a bounded `shopot://i/...` or `shopot1.` code.
+Invitations use the existing binary `CREATE_INVITE` and `ACCEPT_INVITE` methods. The client keeps codes in memory only, reuses one live code instead of exhausting the core's maximum of four live invites, and waits for `CONTACT_JOINED` before exposing the new contact. The invitation sheet supports copy, Android share, and selecting a QR image. A selected image is decoded in memory; its content is accepted only when it is a bounded `stille://i/...` (legacy `shopot://i/...`) or `shopot1.` code.
 
 The QR renderer uses UTF-8 byte mode, error correction H, a four-module quiet zone, black/white modules, and an in-memory symbol-only Stille mark. It verifies the final decorated raster and falls back to a separately verified plain code if the mark reduces decodability. A physical camera, lighting conditions and every display/downscale size still need device validation. The renderer uses a conservative 900-byte input bound after observed detector failures on oversized high-density payloads.
 

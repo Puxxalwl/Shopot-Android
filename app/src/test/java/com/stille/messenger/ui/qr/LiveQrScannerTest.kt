@@ -7,7 +7,10 @@ import org.junit.Test
 class LiveQrScannerTest {
     @Test
     fun acceptsSupportedInvitePrefixes() {
+        assertTrue(isStilleInvite("stille://i/abc123"))
+        assertTrue(isStilleInvite("stille://i3/abc123"))
         assertTrue(isStilleInvite("shopot://i/abc123"))
+        assertTrue(isStilleInvite("shopot://i3/abc123"))
         assertTrue(isStilleInvite("shopot1.abc123"))
     }
 
@@ -17,5 +20,7 @@ class LiveQrScannerTest {
         assertFalse(isStilleInvite("shopot://i/abc 123"))
         assertFalse(isStilleInvite("shopot1.abc\n123"))
         assertFalse(isStilleInvite("shopot://i/"))
+        assertFalse(isStilleInvite("stille://i/"))
+        assertFalse(isStilleInvite("stille://i/" + "x".repeat(4096)))
     }
 }

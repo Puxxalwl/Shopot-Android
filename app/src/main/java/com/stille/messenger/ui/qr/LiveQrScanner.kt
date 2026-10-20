@@ -70,6 +70,7 @@ import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.stille.messenger.diag.StilleLog
+import com.stille.messenger.service.INVITE_PREFIXES
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -677,10 +678,9 @@ private class LiveQrCameraView(
 
 /** Shape-only validation; core remains the authority on invite validity. */
 internal fun isStilleInvite(value: String): Boolean {
-    val hasSupportedPrefix = value.startsWith("shopot://i/") || value.startsWith("shopot1.")
-    val prefixLength = if (value.startsWith("shopot://i/")) 11 else 8
-    return value.length in (prefixLength + 1)..4096 &&
-        hasSupportedPrefix &&
+    val prefix = INVITE_PREFIXES.firstOrNull { value.startsWith(it) } ?: return false
+    return value.length > prefix.length &&
+        value.length <= 4096 &&
         value.none { it.isWhitespace() || it.isISOControl() }
 }
 
