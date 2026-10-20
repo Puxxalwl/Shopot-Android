@@ -1,5 +1,7 @@
 package com.stille.messenger.service
 
+import com.stille.messenger.ui.InviteDeeplinks
+
 /** Invite secrets are process-memory state only: never save to Bundles, files or logs. */
 data class InviteState(
     val ready: Boolean = false,
@@ -25,3 +27,12 @@ internal val INVITE_PREFIXES = listOf("stille://i/", "stille://i3/", "shopot://i
 internal fun validInviteInput(value: String): Boolean =
     value.length in 10..4096 && INVITE_PREFIXES.any { value.startsWith(it) } &&
         value.none { it.isWhitespace() || it.isISOControl() }
+
+/**
+ * Anything the accept path can consume: a full invite code (stille:// or
+ * legacy prefixes) or a stille.im invite link, which carries the full code
+ * with the scheme stripped. Used by the QR scanner and image reader so a
+ * scanned link routes into the same accept flow as a pasted code.
+ */
+internal fun validInviteTarget(value: String): Boolean =
+    InviteDeeplinks.parse(value) != null

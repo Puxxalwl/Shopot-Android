@@ -260,6 +260,77 @@ class StilleService : Service() {
         }
     }
 
+    // ── Persistent profile code / permanent link (CORE-API 2.8.0) ───────
+
+    private val _profileLink = MutableStateFlow(ProfileLinkState())
+    val profileLink = _profileLink.asStateFlow()
+    private val profileLinkMutex = Mutex()
+
+    /**
+     * Loads (or re-issues) the permanent invite link: the persistent profile
+     * code (CREATE_INVITE_EX mode 4 — deterministic, never burns, registry-free)
+     * wrapped in the stille.im URL with the `stille://` scheme stripped. The
+     * link carries the complete code itself. Idempotent: repeating the call
+     * returns the same values, so this is safe on every invite-sheet open.
+     */
+    fun loadProfileLink(name: String) {
+        serviceScope.launch {
+            if (!profileLinkMutex.tryLock()) return@launch
+            try {
+                if (!_isCoreReady.value) { _profileLink.value = ProfileLinkState(error = ProfileLinkError.CORE_UNAVAILABLE); return@launch }
+                if (apiVersion.minor < 8) { _profileLink.value = ProfileLinkState(error = ProfileLinkError.CORE_TOO_OLD); return@launch }
+                _profileLink.value = ProfileLinkState(busy = true)
+                val invite = createProfileInviteLocked(name)
+                _profileLink.value = ProfileLinkState(
+                    link = com.stille.messenger.ui.InviteDeeplinks.profileLink(invite.code),
+                    profileCode = invite.code
+                )
+            } catch (e: TimeoutCancellationException) { _profileLink.value = ProfileLinkState(error = ProfileLinkError.REQUEST_FAILED)
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { _profileLink.value = ProfileLinkState(error = ProfileLinkError.REQUEST_FAILED) }
+            finally { profileLinkMutex.unlock() }
+        }
+    }
+
+    /**
+     * REGENERATE_PROFILE_CODE: rotates the profile-code secret (epoch bump) so
+     * a leaked link/code stops validating immediately; existing contacts and
+     * sessions are unaffected. The new link embeds the new code, so previously
+     * shared links stop working — re-share the new one.
+     */
+    fun rotateProfileLink(name: String) {
+        serviceScope.launch {
+            if (!profileLinkMutex.tryLock()) return@launch
+            try {
+                if (!_isCoreReady.value) { _profileLink.update { it.copy(error = ProfileLinkError.CORE_UNAVAILABLE) }; return@launch }
+                if (apiVersion.minor < 8) { _profileLink.update { it.copy(error = ProfileLinkError.CORE_TOO_OLD) }; return@launch }
+                _profileLink.update { it.copy(busy = true, error = null) }
+                val rotation = Responses.decodeRegenerateProfileCode(
+                    sendRequest(Method.REGENERATE_PROFILE_CODE, Requests.regenerateProfileCode()).second
+                )
+                val invite = createProfileInviteLocked(name)
+                _profileLink.value = ProfileLinkState(
+                    link = com.stille.messenger.ui.InviteDeeplinks.profileLink(invite.code),
+                    profileCode = invite.code,
+                    rotated = true,
+                    persisted = rotation.persisted
+                )
+            } catch (e: TimeoutCancellationException) { _profileLink.update { it.copy(busy = false, error = ProfileLinkError.REQUEST_FAILED) }
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { _profileLink.update { it.copy(busy = false, error = ProfileLinkError.REQUEST_FAILED) }
+            } finally { profileLinkMutex.unlock() }
+        }
+    }
+
+    /** CREATE_INVITE_EX mode 4 with the first reachable direct endpoint (may be empty). */
+    private suspend fun createProfileInviteLocked(name: String): com.stille.coreapi.InviteCode {
+        val endpoints = runCatching {
+            Responses.decodeReachableEndpoints(sendRequest(Method.GET_REACHABLE_ENDPOINTS, Requests.getReachableEndpoints()).second)
+        }.getOrDefault(emptyList())
+        val response = sendRequest(Method.CREATE_INVITE_EX, Requests.createInviteEx(InviteExMode.PROFILE, name, direct = endpoints.firstOrNull().orEmpty()))
+        return Responses.decodeCreateInviteEx(response.second)
+    }
+
     private fun requestContactSnapshot() {
         serviceScope.launch {
             try {
@@ -866,6 +937,8 @@ class StilleService : Service() {
         onlineContactIds.clear()
         _avatars.value = emptyMap()
         _avatarState.value = AvatarState()
+        // The profile link is deterministic; reload it after the next startup.
+        _profileLink.value = ProfileLinkState()
     }
 
     inner class LocalBinder : android.os.Binder() {
