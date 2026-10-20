@@ -103,6 +103,20 @@ class ChatsViewModel : ViewModel() {
                     updateLast(event.cid, messages.lastOrNull())
                 }
             }
+            is CoreEvent.Reaction -> {
+                val service = eventService ?: return
+                val reactionMsgId = event.msgId.copyOf()
+                viewModelScope.launch {
+                    runCatching {
+                        val response = service.sendRequest(Method.GET_MESSAGE, Requests.getMessage(reactionMsgId))
+                        val updated = Responses.decodeGetMessage(response.second, event.cid).message
+                        historyCache[event.cid]?.let { cache ->
+                            val index = cache.indexOfFirst { it.msgId.contentEquals(reactionMsgId) }
+                            if (index >= 0) { cache[index] = updated; updateLast(event.cid, cache.lastOrNull()) }
+                        }
+                    }
+                }
+            }
             else -> Unit
         }
     }
@@ -118,6 +132,24 @@ class ChatsViewModel : ViewModel() {
     }
 
     fun messages(cid: Int): List<Message> = historyCache[cid]?.toList().orEmpty()
+
+    fun setReaction(cid: Int, message: Message, codepoint: Int, add: Boolean, service: StilleService?, onComplete: (Boolean) -> Unit = {}) {
+        val core = service ?: run { onComplete(false); return }
+        if (codepoint !in 0..0x10FFFF || codepoint in 0xD800..0xDFFF) { onComplete(false); return }
+        val reactionMsgId = message.msgId.copyOf()
+        viewModelScope.launch {
+            try {
+                core.sendRequest(if (add) Method.SET_REACTION else Method.REMOVE_REACTION, Requests.reaction(cid, reactionMsgId, codepoint, add))
+                val response = core.sendRequest(Method.GET_MESSAGE, Requests.getMessage(reactionMsgId))
+                val updated = Responses.decodeGetMessage(response.second, cid).message
+                historyCache[cid]?.let { cache ->
+                    val index = cache.indexOfFirst { it.msgId.contentEquals(reactionMsgId) }
+                    if (index >= 0) { cache[index] = updated; updateLast(cid, cache.lastOrNull()) }
+                }
+                onComplete(true)
+            } catch (_: Exception) { onComplete(false) }
+        }
+    }
 
     fun sendMessage(cid: Int, body: String, entities: List<Entity>, service: StilleService?, onComplete: (Boolean) -> Unit = {}) {
         val core = service ?: run { _uiState.value = _uiState.value.copy(error = "Core unavailable"); onComplete(false); return }
@@ -182,6 +214,7 @@ class ChatsViewModel : ViewModel() {
 }
 
 class ChatViewModel(private val cid: Int) : ViewModel() {
+    private var eventService: StilleService? = null
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState = _uiState.asStateFlow()
     private val messageCache = mutableListOf<Message>()
@@ -189,6 +222,7 @@ class ChatViewModel(private val cid: Int) : ViewModel() {
     fun loadHistory(contacts: List<Contact>, service: StilleService?) {
         val contact = contacts.find { it.cid == cid }
         _uiState.value = _uiState.value.copy(contact = contact, isOnline = contact?.online ?: false)
+        eventService = service
         service?.let { core -> viewModelScope.launch {
             try {
                 val response = core.sendRequest(Method.GET_HISTORY, Requests.getHistory(cid, 50))
@@ -209,6 +243,19 @@ class ChatViewModel(private val cid: Int) : ViewModel() {
             is CoreEvent.MessageDelivered -> if (event.cid == cid) {
                 val idx = messageCache.indexOfFirst { it.msgId.contentEquals(event.msgId) }
                 if (idx >= 0) { messageCache[idx] = messageCache[idx].copy(flags = (messageCache[idx].flags.toInt() or 2).toByte()); _uiState.value = _uiState.value.copy(messages = messageCache.toList()) }
+            }
+            is CoreEvent.Reaction -> if (event.cid == cid) {
+                // The event carries no mine flag; GET_MESSAGE is the authoritative resolved view.
+                val coreMessageId = event.msgId.copyOf()
+                viewModelScope.launch {
+                    val service = eventService ?: return@launch
+                    runCatching {
+                        val response = service.sendRequest(Method.GET_MESSAGE, Requests.getMessage(coreMessageId))
+                        val updated = Responses.decodeGetMessage(response.second, cid).message
+                        val idx = messageCache.indexOfFirst { it.msgId.contentEquals(coreMessageId) }
+                        if (idx >= 0) { messageCache[idx] = updated; _uiState.value = _uiState.value.copy(messages = messageCache.toList()) }
+                    }
+                }
             }
             is CoreEvent.ContactJoined -> if (event.cid == cid) _uiState.value = _uiState.value.copy(isOnline = true)
             else -> Unit

@@ -3,6 +3,13 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Chat bubbles render UTF-8 byte-based formatting entities safely (including
+  links) and offer emoji reactions backed by the core reaction API.
+- The official Stille owl mascot is included in the empty chats state as a local drawable.
+
 ## [3.3.0]
 
 ### Added

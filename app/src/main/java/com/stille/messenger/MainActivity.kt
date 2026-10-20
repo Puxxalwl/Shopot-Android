@@ -478,7 +478,7 @@ fun StilleApp(
                     cid = contact.cid, contactName = contact.name, contactOnline = contact.online,
                     messages = currentMessages, avatarBytes = avatarMap[contact.cid],
                     modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-                    onSendMessage = { body, entities, done -> chatsVm.sendMessage(contact.cid, body, entities, coreService, done) }, onBack = { currentChatCid = null }
+                    onSendMessage = { body, entities, done -> chatsVm.sendMessage(contact.cid, body, entities, coreService, done) }, onReaction = { message, cp, add -> chatsVm.setReaction(contact.cid, message, cp, add, coreService) }, onBack = { currentChatCid = null }
                 )
             }
         }

@@ -123,7 +123,8 @@ fun ChatsScreen(
                 QuietEmptyState(
                     if (query.isBlank()) Icons.Outlined.ChatBubbleOutline else Icons.Outlined.SearchOff,
                     if (query.isBlank()) copy("Здесь начнётся разговор", "A conversation starts here") else copy("Ничего не найдено", "No results"),
-                    if (query.isBlank()) copy("Ваши разговоры появятся здесь,\nкогда будет подключён контакт.", "Your conversations appear here\nwhen a contact is connected.") else copy("Попробуйте другое имя", "Try another name")
+                    if (query.isBlank()) copy("Ваши разговоры появятся здесь,\nкогда будет подключён контакт.", "Your conversations appear here\nwhen a contact is connected.") else copy("Попробуйте другое имя", "Try another name"),
+                    showMascot = query.isBlank()
                 )
             }
         } else {
@@ -184,6 +185,7 @@ fun ChatScreen(
     avatarBytes: ByteArray? = null,
     modifier: Modifier = Modifier,
     onSendMessage: (String, List<Entity>, (Boolean) -> Unit) -> Unit,
+    onReaction: (Message, Int, Boolean) -> Unit = { _, _, _ -> },
     onBack: () -> Unit
 ) {
     var draft by rememberSaveable(cid) { mutableStateOf("") }
@@ -209,7 +211,7 @@ fun ChatScreen(
             }
         }
         LazyColumn(Modifier.weight(1f), reverseLayout = true, contentPadding = PaddingValues(vertical = 16.dp)) {
-            items(rows, key = { it.first }, contentType = { "message" }) { (_, message) -> MessageRow(message) }
+            items(rows, key = { it.first }, contentType = { "message" }) { (_, message) -> MessageRow(message) { cp, add -> onReaction(message, cp, add) } }
         }
         Surface(color = MaterialTheme.colorScheme.surface) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
@@ -238,8 +240,21 @@ fun ChatScreen(
 }
 
 @Composable
-fun MessageRow(message: Message) {
-    ChatBubble(message.mine, message.delivered, message.body, timestamp = formatTime(message.tsMs, StilleColors.language), entities = message.entities)
+fun MessageRow(message: Message, onReaction: (Int, Boolean) -> Unit = { _, _ -> }) {
+    var showPicker by remember(message.msgId.toList()) { mutableStateOf(false) }
+    ChatBubble(message.mine, message.delivered, message.body, timestamp = formatTime(message.tsMs, StilleColors.language), entities = message.entities, reactions = message.reactions, onReaction = onReaction, onOpenReactionPicker = { showPicker = true })
+    if (showPicker) AlertDialog(
+        onDismissRequest = { showPicker = false },
+        title = { Text(copy("Реакция", "React")) },
+        text = {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(0x2764, 0x1F44D, 0x1F602).forEach { cp ->
+                    Text(String(Character.toChars(cp)), modifier = Modifier.clickable { showPicker = false; onReaction(cp, true) }, style = MaterialTheme.typography.headlineSmall)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { showPicker = false }) { Text(copy("Закрыть", "Close")) } }
+    )
 }
 
 @Composable

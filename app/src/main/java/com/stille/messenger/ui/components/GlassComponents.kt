@@ -1,6 +1,8 @@
 package com.stille.messenger.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.animateColorAsState
@@ -8,6 +10,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -24,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -102,12 +107,22 @@ fun InitialAvatar(name: String, modifier: Modifier = Modifier, size: Dp = 52.dp)
 }
 
 @Composable
-fun QuietEmptyState(icon: ImageVector, title: String, detail: String, modifier: Modifier = Modifier) {
+fun StilleMascot(modifier: Modifier = Modifier, contentDescription: String = "Stille owl mascot") {
+    androidx.compose.foundation.Image(
+        painter = painterResource(com.stille.messenger.R.drawable.stille_mascot),
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = ContentScale.Fit
+    )
+}
+
+@Composable
+fun QuietEmptyState(icon: ImageVector, title: String, detail: String, modifier: Modifier = Modifier, showMascot: Boolean = false) {
     Column(
         modifier.fillMaxWidth().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(Modifier.size(72.dp).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+        if (showMascot) StilleMascot(Modifier.size(84.dp)) else Box(Modifier.size(72.dp).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
             Icon(icon, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(20.dp))
@@ -117,14 +132,56 @@ fun QuietEmptyState(icon: ImageVector, title: String, detail: String, modifier: 
     }
 }
 
+/** Convert UTF-8 byte offsets from the core entity format to Compose UTF-16 indices. */
+internal fun utf8EntityRange(text: String, offset: Int, length: Int): IntRange? {
+    if (offset < 0 || length <= 0) return null
+    val bytes = text.encodeToByteArray()
+    if (offset > bytes.size || length > bytes.size - offset) return null
+    fun boundary(byteOffset: Int): Int? {
+        var byteIndex = 0
+        var charIndex = 0
+        while (byteIndex < byteOffset) {
+            val codePoint = text.codePointAt(charIndex)
+            val chars = Character.charCount(codePoint)
+            val byteCount = when {
+                codePoint <= 0x7F -> 1
+                codePoint <= 0x7FF -> 2
+                codePoint <= 0xFFFF -> 3
+                else -> 4
+            }
+            byteIndex += byteCount
+            charIndex += chars
+        }
+        return charIndex.takeIf { byteIndex == byteOffset }
+    }
+    val start = boundary(offset) ?: return null
+    val end = boundary(offset + length) ?: return null
+    return if (end > start) start until end else null
+}
+
+internal fun formatEntityStyle(kind: Int, value: String): SpanStyle? = when (kind) {
+    1 -> SpanStyle(fontWeight = FontWeight.Bold)
+    2 -> SpanStyle(fontStyle = FontStyle.Italic)
+    3 -> SpanStyle(textDecoration = TextDecoration.Underline)
+    4 -> SpanStyle(textDecoration = TextDecoration.LineThrough)
+    5 -> SpanStyle(background = Color(0x20000000))
+    6, 7 -> SpanStyle(fontFamily = FontFamily.Monospace)
+    8 -> SpanStyle(color = Color(0xFF64B5F6), textDecoration = TextDecoration.Underline)
+    else -> null
+}
+
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun ChatBubble(
     isMine: Boolean,
     delivered: Boolean,
     body: String,
     modifier: Modifier = Modifier,
     timestamp: String = "",
-    entities: List<Entity> = emptyList()
+    entities: List<Entity> = emptyList(),
+    reactions: List<com.stille.coreapi.Reaction> = emptyList(),
+    onReaction: (Int, Boolean) -> Unit = { _, _ -> },
+    onOpenReactionPicker: (() -> Unit)? = null
 ) {
     val background = if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val foreground = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
@@ -133,17 +190,10 @@ fun ChatBubble(
             append(body)
             entities.forEach { entity ->
                 // Do not let malformed display ranges crash composition. Wire validation is unchanged.
-                if (entity.offset >= 0 && entity.length > 0 && entity.offset <= body.length && entity.length <= body.length - entity.offset) {
-                    val style = when (entity.kind) {
-                        1 -> SpanStyle(fontWeight = FontWeight.Bold)
-                        2 -> SpanStyle(fontStyle = FontStyle.Italic)
-                        3 -> SpanStyle(textDecoration = TextDecoration.Underline)
-                        4 -> SpanStyle(textDecoration = TextDecoration.LineThrough)
-                        5 -> SpanStyle(background = Color(0x20000000))
-                        6, 7 -> SpanStyle(fontFamily = FontFamily.Monospace)
-                        else -> null
-                    }
-                    style?.let { addStyle(it, entity.offset, entity.offset + entity.length) }
+                val range = utf8EntityRange(body, entity.offset, entity.length)
+                if (range != null) {
+                    val style = formatEntityStyle(entity.kind, entity.value)
+                    style?.let { addStyle(it, range.first, range.last + 1) }
                 }
             }
         }
@@ -155,7 +205,26 @@ fun ChatBubble(
         Column(
             Modifier.widthIn(max = 340.dp).background(background, RoundedCornerShape(20.dp, 20.dp, if (isMine) 6.dp else 20.dp, if (isMine) 20.dp else 6.dp)).padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(annotated, color = foreground, style = MaterialTheme.typography.bodyLarge)
+            Text(annotated, color = foreground, style = MaterialTheme.typography.bodyLarge, modifier = if (onOpenReactionPicker != null) Modifier.combinedClickable(onClick = {}, onLongClick = { onOpenReactionPicker.invoke() }) else Modifier)
+            val groupedReactions = reactions.filter { it.codepoint in 0..0x10FFFF && it.codepoint !in 0xD800..0xDFFF }.groupBy { it.codepoint }
+            if (groupedReactions.isNotEmpty() || onOpenReactionPicker != null) Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 5.dp)) {
+                groupedReactions.forEach { (codepoint, values) ->
+                    val emoji = String(Character.toChars(codepoint))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (values.any { it.mine }) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
+                        modifier = Modifier.clickable { onReaction(codepoint, !values.any { it.mine }) }
+                    ) { Text("$emoji ${values.size}", modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelMedium) }
+                }
+                listOf(0x2764, 0x1F44D, 0x1F602).forEach { codepoint ->
+                    if (groupedReactions[codepoint].isNullOrEmpty()) {
+                        Text(String(Character.toChars(codepoint)), modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { onReaction(codepoint, true) }.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+            onOpenReactionPicker?.let { openPicker ->
+                TextButton(onClick = openPicker, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) { Text("＋", color = foreground, style = MaterialTheme.typography.labelMedium) }
+            }
             if (timestamp.isNotEmpty() || isMine) {
                 Spacer(Modifier.height(4.dp))
                 Text(
