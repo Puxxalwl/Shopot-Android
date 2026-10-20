@@ -44,26 +44,26 @@ object Responses {
             state = ConnState.fromValue(r.readU8()),
             attempt = r.readU32()
         )
-        require(r.remaining == 0) { "trailing accept invite response bytes" }
+        if (r.remaining != 0) throw ProtocolException("trailing accept invite response bytes")
         return result
     }
 
     fun decodeCreateInviteEx(payload: ByteArray): InviteCode {
         val r = FrameReader(payload)
         val result = InviteCode(r.readStr16(), r.readBytes(Limits.INVITE_ID))
-        require(r.remaining == 0) { "trailing create invite response bytes" }
+        if (r.remaining != 0) throw ProtocolException("trailing create invite response bytes")
         return result
     }
 
     fun decodeInviteState(payload: ByteArray): InviteStateView {
         val r = FrameReader(payload)
         val result = InviteStateView(InviteLifecycleState.fromValue(r.readU8()), r.readU32().toInt(), r.readI64())
-        require(r.remaining == 0) { "trailing invite state response bytes" }
+        if (r.remaining != 0) throw ProtocolException("trailing invite state response bytes")
         return result
     }
 
     fun decodeContactState(payload: ByteArray): ConnectionStatus {
-        require(payload.size == 11) { "invalid contact state payload size" }
+        if (payload.size != 11) throw ProtocolException("invalid contact state payload size")
         return decodeConnectionStatus(FrameReader(payload))
     }
 
@@ -74,7 +74,7 @@ object Responses {
         val revision = r.readU64()
         val count = boundedCount(r.readU32(), 10_000)
         val contacts = buildList<ContactView>(count) { repeat(count) { add(decodeContactView(r)) } }
-        require(r.remaining == 0) { "trailing bootstrap bytes" }
+        if (r.remaining != 0) throw ProtocolException("trailing bootstrap bytes")
         return ContactsSnapshot(version, epoch, revision, contacts)
     }
 
@@ -96,24 +96,24 @@ object Responses {
                 add(ContactDeltaEntry(itemRevision, change, cid, contact))
             }
         }
-        require(r.remaining == 0) { "trailing contacts delta bytes" }
+        if (r.remaining != 0) throw ProtocolException("trailing contacts delta bytes")
         return ContactsDelta(epoch, revision, changes)
     }
 
     fun decodeReachableEndpoints(payload: ByteArray): List<String> {
         val r = FrameReader(payload)
         val count = r.readU8()
-        require(count <= Limits.REACHABLE_ENDPOINTS_MAX) { "too many endpoints" }
+        if (count > Limits.REACHABLE_ENDPOINTS_MAX) throw ProtocolException("too many endpoints")
         val endpoints = List(count) { r.readStr16().also { value ->
-            require(value.encodeToByteArray().size <= Limits.INVITE_ADDR_MAX) { "endpoint too long" }
+            if (value.encodeToByteArray().size > Limits.INVITE_ADDR_MAX) throw ProtocolException("endpoint too long")
         } }
-        require(r.remaining == 0) { "trailing endpoints bytes" }
+        if (r.remaining != 0) throw ProtocolException("trailing endpoints bytes")
         return endpoints
     }
 
     private fun decodeContactView(r: FrameReader, expectedCid: Int? = null): ContactView {
         val cid = r.readU32().toInt()
-        if (expectedCid != null) require(cid == expectedCid) { "contact delta id mismatch" }
+        if (expectedCid != null && cid != expectedCid) throw ProtocolException("contact delta id mismatch")
         val flags = r.readU8()
         val lastSeen = r.readI64()
         val name = r.readStr16()
@@ -146,7 +146,7 @@ object Responses {
                 add(Message(cid, msgId, flags, ts, body, decodeEntityTail(r)))
             }
         }
-        require(r.remaining == 0) { "trailing history page bytes" }
+        if (r.remaining != 0) throw ProtocolException("trailing history page bytes")
         val cursor = if (hasMore && count > 0) HistoryCursor(nextTs, nextId) else null
         return HistoryPage(hasMore, cursor, messages)
     }
