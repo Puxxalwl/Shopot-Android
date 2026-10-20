@@ -1,9 +1,10 @@
 package com.stille.messenger.backup
 
-import android.accounts.Account
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import com.stille.coreapi.GeneratedCoreApi
+import com.stille.messenger.diag.StilleLog
 import com.stille.messenger.service.StilleService
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -19,10 +20,12 @@ import kotlinx.coroutines.withContext
 
 /**
  * User-facing recovery flow (enable / restore / delete) on top of the
- * core-owned backup (CORE-API.md §4.10) and the user's own Google Drive
- * (CLIENT_RULES.md §4). The client never sees the blob's contents: it
- * derives the 32-byte unlock secret (passkey PRF or recovery code), lets
- * the core seal/open the blob, and stores blob + public sidecar in Drive.
+ * core-owned backup (CORE-API.md §4.10) and the user's own cloud storage
+ * (CLIENT_RULES.md §4): Google Drive via the Android account manager, or a
+ * WebDAV server such as Yandex Disk / Nextcloud. The client never sees the
+ * blob's contents: it derives the 32-byte unlock secret (passkey PRF or
+ * recovery code), lets the core seal/open the blob, and stores blob + public
+ * sidecar in the user's storage.
  *
  * Enable (old device, provisioned profile):
  * ```
@@ -38,7 +41,8 @@ import kotlinx.coroutines.withContext
 class RecoveryController(
     private val context: Context,
     private val passkeys: PasskeyBackupKeys,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    private val vault: CredentialVault = KeystoreCredentialVault(),
 ) {
     enum class Phase { IDLE, CREATING_PASSKEY, DERIVING_SECRET, SEALING, UPLOADING, DOWNLOADING, RESTORING, DELETING }
 
@@ -50,6 +54,11 @@ class RecoveryController(
         /** The blob was sealed with a recovery code (passkey path unavailable). */
         data object NeedsRecoveryCode : Result
         data object Done : Result
+        /**
+         * Google wants an interactive consent screen for Drive access:
+         * launch [intent] with startActivityForResult and retry the operation.
+         */
+        data class ConsentRequired(val intent: Intent) : Result
         data class Failed(val reason: Reason) : Result
     }
 
@@ -73,6 +82,14 @@ class RecoveryController(
 
     private fun prefs() = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /** The remembered storage + login, if still available on this device. */
+    fun savedTarget(): BackupTarget? = when (BackupTarget.savedProvider(context)) {
+        BackupTarget.PROVIDER_WEBDAV ->
+            WebDavSettings.load(context, vault)?.let { BackupTarget.WebDav(it) }
+        else ->
+            AccountManagerDriveTokens.savedAccount(context)?.let { BackupTarget.GoogleDrive(it) }
+    }
+
     // ── enable / update (old device) ────────────────────────────────────
 
     /**
@@ -81,7 +98,7 @@ class RecoveryController(
      * Re-enabling reuses the existing passkey instead of registering a
      * second one. Requires the bound, provisioned [service].
      */
-    fun enable(activity: Activity, account: Account, service: StilleService?, onDone: (Result) -> Unit) {
+    fun enable(activity: Activity, target: BackupTarget, service: StilleService?, onDone: (Result) -> Unit) {
         if (service == null) {
             onDone(Result.Failed(Reason.CORE_UNAVAILABLE))
             return
@@ -118,29 +135,35 @@ class RecoveryController(
                 val blob = seal(service, secret)
                 phase = Phase.UPLOADING
                 _state.value = phase
-                val replaced = upload(account, blob, RecoveryMetadata.Metadata(
+                val replaced = upload(target, blob, RecoveryMetadata.Metadata(
                     keySource = RecoveryMetadata.KEY_SOURCE_PASSKEY,
                     prfSalt = salt,
                     createdMs = System.currentTimeMillis(),
                     apiVersion = GeneratedCoreApi.API_VERSION
                 ), activity)
-                AccountManagerDriveTokens.saveAccountName(context, account.name)
+                rememberTarget(target)
                 prefs().edit().putBoolean(KEY_ENABLED, true)
                     .putInt(KEY_SOURCE, RecoveryMetadata.KEY_SOURCE_PASSKEY).apply()
                 _state.value = Phase.IDLE
+                StilleLog.i("recovery", "backup-uploaded", "replaced=$replaced")
                 onDone(Result.BackupReady(replaced))
             } catch (e: CancellationException) {
                 _state.value = Phase.IDLE
                 throw e
+            } catch (e: AccountManagerDriveTokens.ConsentRequiredException) {
+                _state.value = Phase.IDLE
+                StilleLog.w("recovery", "consent-required", "phase=$phase")
+                onDone(Result.ConsentRequired(e.intent))
             } catch (e: Exception) {
                 _state.value = Phase.IDLE
+                StilleLog.e("recovery", "operation-failed", e, "phase=$phase")
                 onDone(Result.Failed(reasonOf(e)))
             }
         }
     }
 
     /** Recovery-code path: seals with the code the user was shown once. */
-    fun enableWithRecoveryCode(activity: Activity, account: Account, service: StilleService?, code: ByteArray, onDone: (Result) -> Unit) {
+    fun enableWithRecoveryCode(activity: Activity, target: BackupTarget, service: StilleService?, code: ByteArray, onDone: (Result) -> Unit) {
         if (service == null) {
             onDone(Result.Failed(Reason.CORE_UNAVAILABLE))
             return
@@ -152,22 +175,28 @@ class RecoveryController(
                 val blob = seal(service, code)
                 phase = Phase.UPLOADING
                 _state.value = phase
-                val replaced = upload(account, blob, RecoveryMetadata.Metadata(
+                val replaced = upload(target, blob, RecoveryMetadata.Metadata(
                     keySource = RecoveryMetadata.KEY_SOURCE_RECOVERY_CODE,
                     prfSalt = null,
                     createdMs = System.currentTimeMillis(),
                     apiVersion = GeneratedCoreApi.API_VERSION
                 ), activity)
-                AccountManagerDriveTokens.saveAccountName(context, account.name)
+                rememberTarget(target)
                 prefs().edit().putBoolean(KEY_ENABLED, true)
                     .putInt(KEY_SOURCE, RecoveryMetadata.KEY_SOURCE_RECOVERY_CODE).apply()
                 _state.value = Phase.IDLE
+                StilleLog.i("recovery", "backup-uploaded", "replaced=$replaced")
                 onDone(Result.BackupReady(replaced))
             } catch (e: CancellationException) {
                 _state.value = Phase.IDLE
                 throw e
+            } catch (e: AccountManagerDriveTokens.ConsentRequiredException) {
+                _state.value = Phase.IDLE
+                StilleLog.w("recovery", "consent-required", "phase=$phase")
+                onDone(Result.ConsentRequired(e.intent))
             } catch (e: Exception) {
                 _state.value = Phase.IDLE
+                StilleLog.e("recovery", "operation-failed", e, "phase=$phase")
                 onDone(Result.Failed(reasonOf(e)))
             }
         }
@@ -176,11 +205,11 @@ class RecoveryController(
     // ── restore (new device) ────────────────────────────────────────────
 
     /**
-     * Downloads blob + sidecar from the chosen Google account, then runs
+     * Downloads blob + sidecar from the chosen storage, then runs
      * the passkey ceremony and hands the blob+secret to the core.
      * The daemon must be running in recovery mode ([service] unprovisioned).
      */
-    fun beginRestore(activity: Activity, account: Account, service: StilleService?, onDone: (Result) -> Unit) {
+    fun beginRestore(activity: Activity, target: BackupTarget, service: StilleService?, onDone: (Result) -> Unit) {
         if (service == null) {
             onDone(Result.Failed(Reason.CORE_UNAVAILABLE))
             return
@@ -189,7 +218,7 @@ class RecoveryController(
             var phase = Phase.DOWNLOADING
             try {
                 _state.value = phase
-                val downloaded = withContext(Dispatchers.IO) { store(account, activity).download() }
+                val downloaded = withContext(Dispatchers.IO) { store(target, activity).download() }
                     ?: run { _state.value = Phase.IDLE; onDone(Result.Failed(Reason.NO_BACKUP)); return@launch }
                 val metadata = decodeSidecar(downloaded.sidecar)
                     ?: run { _state.value = Phase.IDLE; onDone(Result.Failed(Reason.NO_BACKUP)); return@launch }
@@ -202,6 +231,7 @@ class RecoveryController(
                     _state.value = phase
                     val name = restore(service, downloaded.blob, secret)
                     _state.value = Phase.IDLE
+                    StilleLog.i("recovery", "restored")
                     onDone(Result.Restored(name))
                 } else {
                     _state.value = Phase.IDLE
@@ -210,8 +240,13 @@ class RecoveryController(
             } catch (e: CancellationException) {
                 _state.value = Phase.IDLE
                 throw e
+            } catch (e: AccountManagerDriveTokens.ConsentRequiredException) {
+                _state.value = Phase.IDLE
+                StilleLog.w("recovery", "consent-required", "phase=$phase")
+                onDone(Result.ConsentRequired(e.intent))
             } catch (e: Exception) {
                 _state.value = Phase.IDLE
+                StilleLog.e("recovery", "operation-failed", e, "phase=$phase")
                 onDone(Result.Failed(reasonOf(e)))
             }
         }
@@ -235,6 +270,7 @@ class RecoveryController(
                 throw e
             } catch (e: Exception) {
                 _state.value = Phase.IDLE
+                StilleLog.e("recovery", "operation-failed", e, "phase=RESTORING")
                 onDone(Result.Failed(reasonOf(e)))
             }
         }
@@ -242,20 +278,25 @@ class RecoveryController(
 
     // ── delete ──────────────────────────────────────────────────────────
 
-    fun deleteBackup(activity: Activity, account: Account, onDone: (Result) -> Unit) {
+    fun deleteBackup(activity: Activity, target: BackupTarget, onDone: (Result) -> Unit) {
         scope.launch {
             try {
                 _state.value = Phase.DELETING
-                withContext(Dispatchers.IO) { store(account, activity).delete() }
-                AccountManagerDriveTokens.clearAccountName(context)
+                withContext(Dispatchers.IO) { store(target, activity).delete() }
+                forgetTargets()
                 prefs().edit().putBoolean(KEY_ENABLED, false).remove(KEY_SOURCE).apply()
                 _state.value = Phase.IDLE
                 onDone(Result.Done)
             } catch (e: CancellationException) {
                 _state.value = Phase.IDLE
                 throw e
+            } catch (e: AccountManagerDriveTokens.ConsentRequiredException) {
+                _state.value = Phase.IDLE
+                StilleLog.w("recovery", "consent-required", "phase=DELETING")
+                onDone(Result.ConsentRequired(e.intent))
             } catch (e: Exception) {
                 _state.value = Phase.IDLE
+                StilleLog.e("recovery", "operation-failed", e, "phase=DELETING")
                 onDone(Result.Failed(reasonOf(e)))
             }
         }
@@ -290,13 +331,37 @@ class RecoveryController(
         return name
     }
 
-    private suspend fun upload(account: Account, blob: ByteArray, metadata: RecoveryMetadata.Metadata, activity: Activity): Boolean =
+    private suspend fun upload(target: BackupTarget, blob: ByteArray, metadata: RecoveryMetadata.Metadata, activity: Activity): Boolean =
         withContext(Dispatchers.IO) {
-            store(account, activity).upload(blob, RecoveryMetadata.encode(metadata))
+            store(target, activity).upload(blob, RecoveryMetadata.encode(metadata))
         }
 
-    private fun store(account: Account, activity: Activity): DriveBackupStore =
-        DriveBackupStore(UrlConnectionTransport(), AccountManagerDriveTokens(context, account, activity))
+    private fun store(target: BackupTarget, activity: Activity): BackupStore = when (target) {
+        is BackupTarget.GoogleDrive ->
+            DriveBackupStore(UrlConnectionTransport(), AccountManagerDriveTokens(context, target.account, activity))
+        is BackupTarget.WebDav ->
+            WebDavBackupStore(UrlConnectionTransport(), target.credentials)
+    }
+
+    /** Keeps the chosen provider and its login for later refresh/delete. */
+    private fun rememberTarget(target: BackupTarget) {
+        when (target) {
+            is BackupTarget.GoogleDrive -> {
+                AccountManagerDriveTokens.saveAccountName(context, target.account.name)
+                BackupTarget.saveProvider(context, BackupTarget.PROVIDER_GOOGLE)
+            }
+            is BackupTarget.WebDav -> {
+                WebDavSettings.save(context, target.credentials, vault)
+                BackupTarget.saveProvider(context, BackupTarget.PROVIDER_WEBDAV)
+            }
+        }
+    }
+
+    private fun forgetTargets() {
+        AccountManagerDriveTokens.clearAccountName(context)
+        WebDavSettings.clear(context)
+        BackupTarget.saveProvider(context, BackupTarget.PROVIDER_GOOGLE)
+    }
 
     private fun decodeSidecar(bytes: ByteArray?): RecoveryMetadata.Metadata? {
         if (bytes == null) return null
@@ -307,6 +372,8 @@ class RecoveryController(
         is CoreRecoveryException -> e.reason
         is PasskeyBackupKeys.PasskeyException ->
             if (e.cancelled) Reason.CANCELLED else Reason.PASSKEY_UNAVAILABLE
+        is WebDavCredentials.ValidationException -> Reason.AUTH
+        is WebDavBackupStore.StoreException -> if (e.authentication) Reason.AUTH else Reason.NETWORK
         is DriveBackupStore.StoreException, is java.io.IOException -> Reason.NETWORK
         is AccountManagerDriveTokens.TokenException -> Reason.AUTH
         is RecoveryMetadata.MetadataException -> Reason.NO_BACKUP

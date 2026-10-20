@@ -2,6 +2,8 @@ package com.stille.messenger.ui.screens
 
 import android.accounts.Account
 import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,16 +27,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.stille.messenger.backup.BackupTarget
 import com.stille.messenger.backup.RecoveryCode
 import com.stille.messenger.backup.RecoveryController
+import com.stille.messenger.backup.WebDavBackupStore
 import com.stille.messenger.service.StilleService
 import com.stille.messenger.ui.collectStarted
 
 /**
  * New-device restore flow (CORE-API §4.10, CLIENT_RULES §4.4):
  * ```
- * выбрать аккаунт Google → подтвердить passkey / ввести код →
- * RESTORE_RECOVERY_BACKUP → тот же аккаунт, пустая история
+ * выбрать хранилище (Google Диск / Яндекс Диск / WebDAV) →
+ * подтвердить passkey / ввести код → RESTORE_RECOVERY_BACKUP →
+ * тот же аккаунт, пустая история
  * ```
  * The daemon must already be running in unprovisioned recovery mode
  * ([StilleService.startRecovery]); this dialog waits for its readiness.
@@ -53,6 +58,9 @@ fun RestoreBackupDialog(
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var codeInput by rememberSaveable { mutableStateOf(false) }
     var code by rememberSaveable { mutableStateOf("") }
+    var chooseProvider by rememberSaveable { mutableStateOf(false) }
+    var webDavForm by rememberSaveable { mutableStateOf<String?>(null) } // preset url
+    var consentRetry by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // The daemon boots unprovisioned; wait for the UDS API to come up.
     val coreReady = service?.inviteState?.collectStarted()?.value?.ready == true
@@ -60,18 +68,46 @@ fun RestoreBackupDialog(
     val strings = remember(english) { RecoveryStrings(english) }
     fun errorText(reason: RecoveryController.Reason): String = strings.error(reason)
 
-    val pickAccount = rememberAccountPicker { account: Account ->
+    val consentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val retry = consentRetry
+        if (result.resultCode == Activity.RESULT_OK && retry != null) {
+            retry()
+        } else {
+            busy = false
+            error = errorText(RecoveryController.Reason.AUTH)
+        }
+    }
+
+    fun beginRestore(target: BackupTarget) {
         busy = true
         error = null
-        controller.beginRestore(activity, account, service) { result ->
-            busy = false
+        controller.beginRestore(activity, target, service) { result ->
             when (result) {
                 is RecoveryController.Result.Restored -> onRestored(result.name)
-                is RecoveryController.Result.NeedsRecoveryCode -> codeInput = true
-                is RecoveryController.Result.Failed -> error = errorText(result.reason)
+                is RecoveryController.Result.NeedsRecoveryCode -> { busy = false; codeInput = true }
+                is RecoveryController.Result.ConsentRequired -> {
+                    consentRetry = { controller.beginRestore(activity, target, service) { inner ->
+                        when (inner) {
+                            is RecoveryController.Result.Restored -> onRestored(inner.name)
+                            is RecoveryController.Result.NeedsRecoveryCode -> { busy = false; codeInput = true }
+                            is RecoveryController.Result.Failed -> { busy = false; error = errorText(inner.reason) }
+                            else -> {}
+                        }
+                    } }
+                    consentLauncher.launch(result.intent)
+                }
+                is RecoveryController.Result.Failed -> { busy = false; error = errorText(result.reason) }
                 else -> {}
             }
         }
+    }
+
+    val pickAccount = rememberAccountPicker { account: Account ->
+        beginRestore(BackupTarget.GoogleDrive(account))
+    }
+
+    fun openProviderChoice() {
+        if (webDavForm == null && !codeInput) chooseProvider = true
     }
 
     AlertDialog(
@@ -81,9 +117,9 @@ fun RestoreBackupDialog(
             Column {
                 Text(
                     if (english)
-                        "Choose the Google account with your saved copy. Confirm your sign-in key or enter your recovery code. Your profile and contacts will return, but not your messages."
+                        "Choose the storage with your saved copy — Google Drive, Yandex Disk or another WebDAV cloud. Confirm your sign-in key or enter your recovery code. Your profile and contacts will return, but not your messages."
                     else
-                        "Выберите аккаунт Google с сохранённой копией. Подтвердите ключ входа или введите код восстановления. Профиль и контакты вернутся, переписка — нет.",
+                        "Выберите хранилище с сохранённой копией — Google Диск, Яндекс Диск или другое WebDAV-облако. Подтвердите ключ входа или введите код восстановления. Профиль и контакты вернутся, переписка — нет.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(Modifier.height(12.dp))
@@ -115,8 +151,8 @@ fun RestoreBackupDialog(
                 if (busy || !coreReady) {
                     CircularProgressIndicator(Modifier.height(24.dp).padding(end = 16.dp), strokeWidth = 2.dp)
                 } else {
-                    OutlinedButton(onClick = pickAccount) {
-                        Text(if (english) "Choose Google account" else "Выбрать аккаунт Google")
+                    OutlinedButton(onClick = { openProviderChoice() }) {
+                        Text(if (english) "Choose storage" else "Выбрать хранилище")
                     }
                 }
             } else {
@@ -146,4 +182,41 @@ fun RestoreBackupDialog(
             if (!busy) TextButton(onClick = onDismiss) { Text(if (english) "Cancel" else "Отмена") }
         }
     )
+
+    if (chooseProvider) {
+        AlertDialog(
+            onDismissRequest = { chooseProvider = false },
+            title = { Text(strings.storageTitle) },
+            text = { Text(strings.storageBody, style = MaterialTheme.typography.bodySmall) },
+            confirmButton = {
+                Column(Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { chooseProvider = false; pickAccount() }) {
+                        Text(strings.googleDrive)
+                    }
+                    TextButton(onClick = { chooseProvider = false; webDavForm = WebDavBackupStore.YANDEX_DISK_URL }) {
+                        Text(strings.yandexDisk)
+                    }
+                    TextButton(onClick = { chooseProvider = false; webDavForm = "" }) {
+                        Text(strings.otherWebDav)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { chooseProvider = false }) { Text(strings.cancel) }
+            }
+        )
+    }
+
+    webDavForm?.let { preset ->
+        WebDavLoginDialog(
+            english = english,
+            presetUrl = preset,
+            confirmLabel = strings.webdavConnect,
+            onDismiss = { webDavForm = null },
+            onSubmit = { credentials ->
+                webDavForm = null
+                beginRestore(BackupTarget.WebDav(credentials))
+            }
+        )
+    }
 }

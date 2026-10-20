@@ -13,11 +13,15 @@ unlock ceremony and stores the sealed package in the user's own cloud.
 
 ## What is backed up
 
-Google Drive (hidden `appDataFolder` scope) holds exactly two opaque files:
+The chosen cloud storage holds exactly two opaque files — in Google Drive's
+hidden `appDataFolder` scope, or in a dedicated directory on a WebDAV
+server:
 
 ```text
-appDataFolder/stille-recovery-v1.bin   — core-sealed recovery blob
-appDataFolder/stille-recovery-v1.meta  — public sidecar
+appDataFolder/stille-recovery-v1.bin   — core-sealed recovery blob   (Drive)
+appDataFolder/stille-recovery-v1.meta  — public sidecar              (Drive)
+/stille-backup/stille-recovery-v1.bin  — core-sealed recovery blob   (WebDAV)
+/stille-backup/stille-recovery-v1.meta — public sidecar              (WebDAV)
 ```
 
 The blob is produced by the core: ChaCha20-Poly1305 with a key derived
@@ -51,9 +55,30 @@ Two sources (CLIENT_RULES.md §4.1), both 32 bytes, both never stored:
    stored. Cancelling confirmation does not start the fallback.
 
 Google Drive authorization uses the platform's `oauth2:` token type and an
-Activity-backed consent prompt. Network and token requests run off the main
-thread; credential prompts and UI results run on the main thread. Google
-OAuth configuration and domain association are still release prerequisites.
+Activity-backed consent prompt; when Google requires interactive consent,
+the client opens the consent screen and automatically retries the failed
+operation after access is granted. Network and token requests run off the
+main thread; credential prompts and UI results run on the main thread.
+Google OAuth configuration and domain association are still release
+prerequisites.
+
+## Storage providers
+
+The copy always lives in the user's own cloud; Stille operates no servers.
+
+| Provider | Transport | Login |
+|---|---|---|
+| Google Drive | Drive REST v3, `drive.appdata` scope | Android account picker |
+| Yandex Disk | WebDAV over HTTPS (`webdav.yandex.ru`) | username + app password |
+| Other WebDAV (Nextcloud, ownCloud, …) | WebDAV over HTTPS | username + password |
+
+WebDAV credentials are entered once and reused for refresh/delete. The
+password is stored only in encrypted form (AES-256-GCM, key held by the
+Android Keystore) inside the app's private storage, and the server address
+must be HTTPS. Yandex requires a dedicated **app password** for external
+apps (id.yandex.ru → Security); the account password will not work.
+WebDAV uploads `PUT` the files in place, so a failed upload never destroys
+the last good copy.
 
 ## User flow
 
@@ -75,7 +100,7 @@ Restore on a new device (Welcome screen → Restore account):
 
 ```text
 запустить ядро в recovery-режиме (serve без seed)
-→ выбрать аккаунт Google
+→ выбрать хранилище (Google Диск / Яндекс Диск / WebDAV)
 → подтвердить passkey / ввести код
 → RESTORE_RECOVERY_BACKUP(blob, unlock_secret)
 → тот же аккаунт, пустая история
@@ -104,6 +129,7 @@ itself. Cancelling the dialog stops the unprovisioned daemon.
 
 - `drive.appdata` OAuth scope requires Google verification for
   production builds.
+- WebDAV providers need no registration or project-side setup.
 - RP id `stille.app` must be linked via Digital Asset Links before the
   passkey ceremony works in release builds.
 - PRF support depends on the platform authenticator; the recovery-code

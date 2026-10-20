@@ -21,11 +21,8 @@ import java.net.URL
 class DriveBackupStore(
     private val transport: HttpTransport,
     private val tokenProvider: DriveTokenProvider
-) {
+) : BackupStore {
     class StoreException(message: String) : Exception(message)
-
-    /** The downloaded pair; the sidecar is null when only a legacy blob exists. */
-    data class Downloaded(val blob: ByteArray, val sidecar: ByteArray?)
 
     companion object {
         const val FILE_NAME = "stille-recovery-v1.bin"
@@ -41,7 +38,7 @@ class DriveBackupStore(
     }
 
     /** Upload (create or replace) the sealed blob and its sidecar atomically enough. */
-    fun upload(blob: ByteArray, sidecar: ByteArray): Boolean {
+    override fun upload(blob: ByteArray, sidecar: ByteArray): Boolean {
         if (blob.isEmpty() || blob.size > MAX_BLOB_BYTES) {
             throw StoreException("backup blob size out of range")
         }
@@ -54,19 +51,19 @@ class DriveBackupStore(
     }
 
     /** Download the blob + sidecar, or null when this Google account has none. */
-    fun download(): Downloaded? {
+    override fun download(): BackupStore.Downloaded? {
         val blob = downloadByName(FILE_NAME, MAX_BLOB_BYTES) ?: return null
         val sidecar = downloadByName(SIDECAR_NAME, MAX_SIDECAR_BYTES)
-        return Downloaded(blob, sidecar)
+        return BackupStore.Downloaded(blob, sidecar)
     }
 
-    fun delete(): Boolean {
+    override fun delete(): Boolean {
         val blobDeleted = deleteByName(FILE_NAME)
         deleteByName(SIDECAR_NAME)
         return blobDeleted
     }
 
-    fun hasBackup(): Boolean = findFileId(FILE_NAME) != null
+    override fun hasBackup(): Boolean = findFileId(FILE_NAME) != null
 
     // ── internals ────────────────────────────────────────────────────────
 
