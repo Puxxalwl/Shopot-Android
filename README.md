@@ -98,6 +98,29 @@ of one one-time code is serialized by the core and only the first valid JOIN
 can create the connection. Both devices must be on the same LAN for an
 address-less invite, with multicast enabled, or use a reachable address/relay.
 
+## Permanent invite link
+
+Besides the one-time invite, the invitation sheet shows your **permanent
+link** — `https://stille.im/invite/{code}` — which is the persistent
+profile code (`CREATE_INVITE_EX` mode 4, API 2.8.0) with the `stille://`
+scheme stripped. The link **carries the complete invitation itself**:
+deterministically derived from the identity seed, it never burns, does not
+count against the four live one-time invites, and anyone who receives the
+link (messenger, QR, tap) can connect directly — the stille.im site is only
+a redirector and holds no mapping, short code or bundle. **Reset link**
+rotates the profile-code secret (`REGENERATE_PROFILE_CODE`) when it leaks:
+previously shared links stop validating immediately, existing contacts and
+chats are unaffected.
+
+The app is the only handler: a tapped `https://stille.im/invite/i/…` or
+`stille.im/invite/i3/…` link (with or without the `https://` prefix, plain
+`http://` rejected) is reconstructed locally by re-attaching the
+`stille://` scheme and fed straight into `ACCEPT_INVITE` — no network
+round-trip, no server-side state. Direct `stille://i…` invite codes shared
+in messengers open the same flow. The live camera scanner, saved QR images
+and pasted input accept all of these through the same parsing, and invite
+codes never appear in logs.
+
 ## Setup
 
 ### Prerequisites
