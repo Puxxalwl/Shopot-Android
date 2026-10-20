@@ -20,7 +20,14 @@ class AccountManagerDriveTokens(
 
     private val accountManager = AccountManager.get(context.applicationContext)
 
-    class TokenException(message: String) : Exception(message)
+    open class TokenException(message: String) : Exception(message)
+
+    /**
+     * Google wants an interactive consent screen for the Drive scope. The
+     * intent must be launched from the UI (startActivityForResult) and the
+     * failed operation retried afterwards.
+     */
+    class ConsentRequiredException(val intent: android.content.Intent) : TokenException("Google account consent required")
 
     override fun accessToken(): String {
         // The Activity overload lets Android show Google's consent UI. Never
@@ -41,8 +48,8 @@ class AccountManagerDriveTokens(
         }
         val intent = bundle.get(AccountManager.KEY_INTENT)
         if (intent is android.content.Intent) {
-            // Consent requires an interactive launch the caller must handle.
-            throw TokenException("Google account consent required")
+            // Interactive consent: hand the launchable intent to the caller.
+            throw ConsentRequiredException(intent)
         }
         val token = bundle.getString(AccountManager.KEY_AUTHTOKEN)
         if (token.isNullOrBlank()) throw TokenException("empty Drive token")
