@@ -8,7 +8,7 @@ Serverless P2P messenger Android client for the [stille-messenger-core](https://
 
 - **P2P — no servers.** Direct TCP (ports 7777–7786), LAN discovery, or
   self-hosted relay (IP hiding).
-- **End-to-end encrypted.** The client never touches keys — the `shopot serve`
+- **End-to-end encrypted.** The client never touches keys — the `stille-messenger-core serve`
   daemon owns all cryptography (double ratchet, AEAD, forward secrecy).
 - **No telemetry, no analytics, no Firebase.**
 - **Glassmorphism UI** — iPhone-style translucent panels with blur.
@@ -168,8 +168,8 @@ core-src/                 # stille-messenger-core source (git submodule / cloned
 The `data` module implements the binary UDS protocol codec. The
 `StilleService` foreground service:
 1. Uses `libstille.so` from Android's installed `nativeLibraryDir` (an executable, not JNI)
-2. Creates the local core identity once with `stille-messenger init`, never overwriting an existing seed (or starts unprovisioned in recovery mode)
-3. Starts `stille-messenger serve` and connects to `~/.shopot/api.sock` (UDS)
+2. Creates the local core identity once with `stille-messenger-core init`, never overwriting an existing seed (or starts unprovisioned in recovery mode)
+3. Starts `stille-messenger-core serve` and connects to `~/.stille-messenger/api.sock` (UDS)
 4. Sends `GET_VERSION` to verify core compatibility
 5. Listens for events and broadcasts them to the UI via `StateFlow`
 

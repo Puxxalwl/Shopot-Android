@@ -8,7 +8,7 @@ import com.stille.messenger.ui.SetupPreferences
 
 /**
  * Boot receiver: restart the foreground service after device reboot
- * so shopot-core daemon resumes and can deliver queued messages.
+ * so the stille core daemon resumes and can deliver queued messages.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {

@@ -159,8 +159,8 @@ tools/                    # Скрипты кросс-компиляции
 
 `StilleService` — foreground service, который:
 1. Использует `libstille.so` из установленного Android `nativeLibraryDir` (исполняемый файл, не JNI)
-2. Один раз создаёт локальную identity через `stille-messenger init`, никогда не перезаписывая существующий seed (или стартует без профиля в recovery-режиме)
-3. Запускает `stille-messenger serve` и подключается к UDS `$HOME/.shopot/api.sock`
+2. Один раз создаёт локальную identity через `stille-messenger-core init`, никогда не перезаписывая существующий seed (или стартует без профиля в recovery-режиме)
+3. Запускает `stille-messenger-core serve` и подключается к UDS `$HOME/.stille-messenger/api.sock`
 4. Отправляет `GET_VERSION` для проверки совместимости
 5. Слушает события и рассылает их в UI через `StateFlow`
 

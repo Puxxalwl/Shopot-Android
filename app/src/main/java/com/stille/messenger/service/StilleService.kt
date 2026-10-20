@@ -376,9 +376,12 @@ class StilleService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // HOME for the core daemon. The data directory inside it moved from
+        // .shopot to .stille-messenger (core rename); the core migrates the
+        // legacy directory atomically on startup, so the HOME itself is stable.
         coreDir = File(filesDir, "shopot")
         homeDir = coreDir
-        socketPath = "$homeDir/.shopot/api.sock"
+        socketPath = "$homeDir/.stille-messenger/api.sock"
         createNotificationChannel()
     }
 
@@ -491,9 +494,20 @@ class StilleService : Service() {
                 environment()["PATH"] = "/system/bin:/bin"
             }
 
+    /**
+     * Seed location after the core rename: ~/.stille-messenger/zig-seed, with
+     * the legacy ~/.shopot/zig-seed still recognized until the core migrates
+     * the directory (so an updated install never re-inits an existing identity).
+     */
+    private fun coreSeedFile(): File {
+        val migrated = File(homeDir, ".stille-messenger/zig-seed")
+        val legacy = File(homeDir, ".shopot/zig-seed")
+        return if (migrated.exists() || !legacy.exists()) migrated else legacy
+    }
+
     /** Invoke only the core's init command; never replace an existing identity. */
     private suspend fun ensureIdentity() {
-        val seed = File(homeDir, ".shopot/zig-seed")
+        val seed = coreSeedFile()
         if (!needsCoreIdentity(seed)) return
         val process = coreCommand("init").start()
         try {

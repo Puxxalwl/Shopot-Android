@@ -52,7 +52,7 @@ zig build -j1 -Doptimize=ReleaseSmall \
 OUTPUT_DIR="$PROJECT_DIR/app/src/main/jniLibs/arm64-v8a"
 mkdir -p "$OUTPUT_DIR"
 
-BINARY="$REPO_DIR/core/zig-out/bin/stille-messenger"
+BINARY="$REPO_DIR/core/zig-out/bin/stille-messenger-core"
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: build output not found at $BINARY"
     ls -la "$REPO_DIR/core/zig-out/bin/" 2>/dev/null || true
