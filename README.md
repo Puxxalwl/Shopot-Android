@@ -17,9 +17,10 @@ Serverless P2P messenger Android client for the [stille-messenger-core](https://
 - **Files & photos** — up to 64 MB, resumable.
 - **Voice calls** — 16 kHz E2EE with ADPCM+DTX.
 - **Offline delivery** — encrypted outbox with ACKs and dedup.
-- **Account recovery** — a passkey + one core-sealed file in Google Drive
-  restores your identity, profile, contacts and routes on a new device;
-  message history is never synced. See [docs/RECOVERY.md](docs/RECOVERY.md).
+- **Account recovery** — a passkey + one core-sealed file in your own
+  cloud (Google Drive, Yandex Disk or any WebDAV server) restores your
+  identity, profile, contacts and routes on a new device; message history
+  is never synced. See [docs/RECOVERY.md](docs/RECOVERY.md).
 
 ## Screenshots
 
@@ -46,7 +47,9 @@ These choices are stored locally on the device and can be changed later in the
 app settings/profile. Stille can check the public GitHub Releases feed once per
 launch; this can be disabled in Settings while manual checks remain available in
 About Stille. Updates are downloaded only after confirmation and are verified
-before Android's system installer opens.
+(checksum, signing certificate, version) before Android's system installer
+opens automatically — the missing "install unknown apps" permission is
+requested before the download starts, not after it.
 
 
 Stille means “silence” in German. Names are limited to 1–32 UTF-8 bytes, matching
@@ -178,7 +181,9 @@ Packaging enables native extraction: Android 10+ blocks execution from writable
 app data, so an asset copied into `filesDir` cannot be used. APK packaging fails
 if the AArch64 core is missing; Kotlin-only checks need no binary. Profile and
 invite screens offer a retry action. Startup logs contain only fixed stages and
-exception types, never core output or identities. Install the updated APK over
+exception types, never core output or identities. A redacted diagnostics log
+file (stages, error types; no messages, contacts or secrets) can be shared
+from Settings by tapping "About Stille" five times quickly. Install the updated APK over
 the existing app; do not clear data to troubleshoot startup.
 
 ### Adding a friend

@@ -3,6 +3,37 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Live QR invitation scanner: the camera permission is now requested as soon
+  as the scanner opens instead of showing a black screen; `Camera.open()` and
+  preview configuration moved off the main thread onto a dedicated worker
+  with one automatic retry; the overlay no longer relies on dialog insets
+  that resolve to zero with `decorFitsSystemWindows=false`, so the frame and
+  buttons align on all devices.
+- Google Drive recovery consent is now launched interactively: when the
+  account manager returns a consent intent, the client opens Google's screen
+  and retries the interrupted enable/restore/delete automatically.
+- In-app updates install themselves: the "install unknown apps" permission is
+  requested *before* the APK download starts (previously the whole 50 MiB was
+  downloaded and only then failed), the download resumes automatically when
+  the user returns from the permission screen, and Android's install
+  confirmation opens by itself once the verified download is ready.
+
+### Added
+- Recovery backup storage providers beyond Google Drive, with no new
+  dependencies and no project-operated servers: **Yandex Disk**
+  (`webdav.yandex.ru`, app password) and **any WebDAV server** (Nextcloud,
+  ownCloud, …) over HTTPS with Basic auth. WebDAV passwords are stored
+  encrypted at rest (AES-256-GCM, Android Keystore). The provider is chosen
+  when enabling recovery and again when restoring on a new device.
+- Redacted file-backed diagnostics log (`files/logs/stille.log`, bounded to
+  512 KiB with one rotated generation; fixed stages and exception class names
+  only — never messages, contacts, invite codes or keys). Open it from
+  Settings by tapping "About Stille" five times quickly, then share or clear
+  it; uncaught exceptions are recorded there too.
+
 ## [3.1.1]
 
 ### Fixed
