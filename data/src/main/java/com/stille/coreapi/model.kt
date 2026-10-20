@@ -18,6 +18,18 @@ data class ContactsDelta(val epoch: ByteArray, val revision: Long, val entries: 
 data class InviteCode(val code: String, val inviteId: ByteArray)
 data class InviteStateView(val state: InviteLifecycleState, val acceptedCid: Int, val expiresAtMs: Long)
 data class AcceptInviteResult(val cid: Int, val disposition: AcceptDisposition, val state: ConnState, val attempt: Long)
+
+// ── Short identity codes / persistent profile code (CORE-API 2.8.0 §4.2) ──
+
+/** GENERATE_SHORT_CODE result: cid 0 = own identity, code is the 9-char identifier. */
+data class ShortCodeView(val cid: Int, val code: String)
+
+/** DECODE_SHORT_CODE result: cid 0 = own identity; full_code is the v1-format code. */
+data class DecodedShortCodeView(val cid: Int, val fullCode: String)
+
+/** REGENERATE_PROFILE_CODE result: epoch bump; persisted=false means no encrypted log (rotation lives until restart). */
+data class ProfileCodeRotation(val epoch: Long, val persisted: Boolean)
+
 data class HistoryCursor(val beforeTsMs: Long, val beforeMsgId: ByteArray) {
     init { require(beforeMsgId.size == 16) { "cursor message id must be 16 bytes" } }
 }

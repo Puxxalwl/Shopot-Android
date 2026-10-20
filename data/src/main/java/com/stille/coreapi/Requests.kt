@@ -105,6 +105,21 @@ object Requests {
         }.toByteArray()
     }
 
+    // ── 4.2 Short identity codes (API 2.8.0) ────────────────────────────
+
+    /** GENERATE_SHORT_CODE (52): [cid u32 (0 = own identity)]. */
+    fun generateShortCode(cid: Int = 0): ByteArray = encodeU32Payload(cid)
+
+    /** DECODE_SHORT_CODE (53): [code str16]. The core normalizes case/typos itself. */
+    fun decodeShortCode(code: String): ByteArray {
+        require(code.isNotEmpty()) { "short code must not be empty" }
+        require(code.encodeToByteArray().size <= 65535) { "short code too long for str16" }
+        return FrameBuffer().apply { writeStr16(code) }.toByteArray()
+    }
+
+    /** REGENERATE_PROFILE_CODE (54): ∅ — rotate the persistent profile code secret. */
+    fun regenerateProfileCode(): ByteArray = byteArrayOf()
+
     // ── 4.3 Messages ────────────────────────────────────────────────────
 
     /** SEND_MESSAGE (7): [cid u32][body str16 ≤4096][entity tail]. */

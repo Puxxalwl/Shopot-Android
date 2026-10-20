@@ -3,6 +3,7 @@ package com.stille.coreapi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class StilleProtocolTest {
@@ -245,6 +246,95 @@ class StilleProtocolTest {
         assertEquals(1, r.readU8()); assertEquals("A", r.readStr16()); assertEquals("10.0.0.1:7777", r.readStr16()); assertEquals("", r.readStr16())
         val history = Requests.getHistoryPage(4, HistoryCursor(99, ByteArray(16) { 2 }), 30)
         assertEquals(4, FrameReader(history).readU32().toInt())
+    }
+
+    @Test
+    fun `api 2_8 method ids and invite mode match spec`() {
+        assertEquals(52, Method.GENERATE_SHORT_CODE.id)
+        assertEquals(53, Method.DECODE_SHORT_CODE.id)
+        assertEquals(54, Method.REGENERATE_PROFILE_CODE.id)
+        assertEquals(4, InviteExMode.PROFILE.value)
+        assertEquals(InviteExMode.PROFILE, InviteExMode.fromValue(4))
+        assertEquals(9, Limits.SHORT_CODE)
+        assertEquals("2.8.0", GeneratedCoreApi.API_VERSION)
+        assertEquals(52, GeneratedCoreApi.Method.GENERATE_SHORT_CODE)
+        assertEquals(53, GeneratedCoreApi.Method.DECODE_SHORT_CODE)
+        assertEquals(54, GeneratedCoreApi.Method.REGENERATE_PROFILE_CODE)
+    }
+
+    @Test
+    fun `api 2_8 requests encode exact layouts`() {
+        // GENERATE_SHORT_CODE (52): [cid u32]; cid 0 = own identity.
+        assertBytes(byteArrayOf(0, 0, 0, 0), Requests.generateShortCode())
+        assertBytes(byteArrayOf(7, 0, 0, 0), Requests.generateShortCode(7))
+
+        // DECODE_SHORT_CODE (53): [code str16] — 2-byte length prefix + 9 bytes.
+        val decode = Requests.decodeShortCode("N9S5WMD9D")
+        assertEquals(2 + 9, decode.size)
+        val dr = FrameReader(decode)
+        assertEquals("N9S5WMD9D", dr.readStr16())
+        assertEquals(0, dr.remaining)
+
+        // REGENERATE_PROFILE_CODE (54): ∅.
+        assertEquals(0, Requests.regenerateProfileCode().size)
+    }
+
+    @Test
+    fun `api 2_8 response decoders reject invalid input`() {
+        assertFailsWith<IllegalArgumentException> { Requests.decodeShortCode("") }
+    }
+
+    @Test
+    fun `api 2_8 responses decode per section 4-2`() {
+        // GENERATE_SHORT_CODE (52): [cid u32][code str16].
+        val generated = FrameBuffer().apply { writeU32(0); writeStr16("N9S5WMD9D") }.toByteArray()
+        val shortCode = Responses.decodeGenerateShortCode(generated)
+        assertEquals(0, shortCode.cid)
+        assertEquals("N9S5WMD9D", shortCode.code)
+        assertFailsWith<ProtocolException> { Responses.decodeGenerateShortCode(generated + byteArrayOf(0)) }
+
+        // DECODE_SHORT_CODE (53): [cid u32 (0 = own identity)][full_code str16].
+        val decoded = FrameBuffer().apply { writeU32(3); writeStr16("shopot1.YWxpY2U") }.toByteArray()
+        val resolution = Responses.decodeDecodeShortCode(decoded)
+        assertEquals(3, resolution.cid)
+        assertEquals("shopot1.YWxpY2U", resolution.fullCode)
+        assertFailsWith<ProtocolException> { Responses.decodeDecodeShortCode(decoded + byteArrayOf(1)) }
+
+        // REGENERATE_PROFILE_CODE (54): [epoch u32][persisted u8].
+        val rotation = FrameBuffer().apply { writeU32(4); writeU8(1) }.toByteArray()
+        val rotated = Responses.decodeRegenerateProfileCode(rotation)
+        assertEquals(4L, rotated.epoch)
+        assertTrue(rotated.persisted)
+        val volatileRotation = FrameBuffer().apply { writeU32(1); writeU8(0) }.toByteArray()
+        assertFalse(Responses.decodeRegenerateProfileCode(volatileRotation).persisted)
+        assertFailsWith<ProtocolException> { Responses.decodeRegenerateProfileCode(rotation + byteArrayOf(0)) }
+    }
+
+    @Test
+    fun `short code normalization mirrors core rules`() {
+        // Core golden vector N9S5WMD9D (invite.zig): canonical and lowercase forms.
+        assertEquals("N9S5WMD9D", ShortCode.normalize("N9S5WMD9D"))
+        assertEquals("N9S5WMD9D", ShortCode.normalize("n9s5wmd9d"))
+        assertEquals(9, ShortCode.LENGTH)
+
+        // Crockford typo mapping, verified against the checksum:
+        // checksum("N1S5WMD9") = 'X', checksum("N0S5WMD9") = 'V', checksum("N9V5WMD9") = 'K'.
+        assertEquals("N1S5WMD9X", ShortCode.normalize("nIs5wmd9x"))   // I → 1
+        assertEquals("N1S5WMD9X", ShortCode.normalize("NlS5WMD9X"))   // L → 1
+        assertEquals("N0S5WMD9V", ShortCode.normalize("nOs5wmd9v"))   // O → 0
+        assertEquals("N9V5WMD9K", ShortCode.normalize("n9u5wmd9k"))   // U → V
+
+        // Wrong checksum character is rejected.
+        assertTrue(ShortCode.normalize("N9S5WMD9E") == null)
+    }
+
+    @Test
+    fun `short code normalization rejects malformed input`() {
+        assertTrue(ShortCode.normalize("") == null)
+        assertTrue(ShortCode.normalize("N9S5WMD") == null)            // too short
+        assertTrue(ShortCode.normalize("N9S5WMD9D1") == null)         // too long
+        assertTrue(ShortCode.normalize("N9S5WMD9!") == null)          // invalid character
+        assertTrue(ShortCode.normalize("N9S5WMD9\n") == null)         // control character
     }
 
     @Test

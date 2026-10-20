@@ -1,7 +1,7 @@
 package com.stille.coreapi
 
 /**
- * Binary UDS interface codec for stille-messenger core (API 2.7.0).
+ * Binary UDS interface codec for stille-messenger core (API 2.8.0).
  *
  * Implements the 16-byte LE frame header and all typed payload encoders/decoders
  * for request methods, responses, and events as defined in:
@@ -89,7 +89,11 @@ enum class Method(val id: Int) {
     GET_REACHABLE_ENDPOINTS(48),
     CREATE_INVITE_EX(49),
     GET_INVITE_STATE(50),
-    GET_HISTORY_PAGE(51);
+    GET_HISTORY_PAGE(51),
+    // 2.8.0 — short identity codes and the persistent profile code
+    GENERATE_SHORT_CODE(52),
+    DECODE_SHORT_CODE(53),
+    REGENERATE_PROFILE_CODE(54);
 
     companion object {
         fun fromId(id: Int) = entries.firstOrNull { it.id == id }
@@ -211,6 +215,8 @@ object Limits {
     const val INVITE_ID = 16
     const val CONTACT_EPOCH = 16
     const val REACHABLE_ENDPOINTS_MAX = 255
+    // 2.8.0 — short identity code (§4.2): 8 Crockford data chars + 1 checksum char
+    const val SHORT_CODE = 9
 }
 
 // ── Exceptions ────────────────────────────────────────────────────────────
@@ -234,7 +240,9 @@ enum class AcceptDisposition(val value: Int) {
 }
 
 enum class InviteExMode(val value: Int) {
-    DISCOVERY(0), DIRECT(1), RELAY_ONLY(2), DIRECT_THEN_RELAY(3);
+    DISCOVERY(0), DIRECT(1), RELAY_ONLY(2), DIRECT_THEN_RELAY(3),
+    /** 2.8.0 mode 4: persistent profile code (deterministic secret, never burns). */
+    PROFILE(4);
     companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown invite mode") }
 }
 

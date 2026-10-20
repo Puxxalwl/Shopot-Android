@@ -111,6 +111,32 @@ object Responses {
         return endpoints
     }
 
+    // ── 4.2 Short identity codes (API 2.8.0) ────────────────────────────
+
+    /** GENERATE_SHORT_CODE (52): [cid u32][code str16]. */
+    fun decodeGenerateShortCode(payload: ByteArray): ShortCodeView {
+        val r = FrameReader(payload)
+        val result = ShortCodeView(r.readU32().toInt(), r.readStr16())
+        if (r.remaining != 0) throw ProtocolException("trailing short code response bytes")
+        return result
+    }
+
+    /** DECODE_SHORT_CODE (53): [cid u32 (0 = own identity)][full_code str16]. */
+    fun decodeDecodeShortCode(payload: ByteArray): DecodedShortCodeView {
+        val r = FrameReader(payload)
+        val result = DecodedShortCodeView(r.readU32().toInt(), r.readStr16())
+        if (r.remaining != 0) throw ProtocolException("trailing decoded short code response bytes")
+        return result
+    }
+
+    /** REGENERATE_PROFILE_CODE (54): [epoch u32][persisted u8]. */
+    fun decodeRegenerateProfileCode(payload: ByteArray): ProfileCodeRotation {
+        val r = FrameReader(payload)
+        val result = ProfileCodeRotation(r.readU32(), r.readU8() != 0)
+        if (r.remaining != 0) throw ProtocolException("trailing profile code rotation bytes")
+        return result
+    }
+
     private fun decodeContactView(r: FrameReader, expectedCid: Int? = null): ContactView {
         val cid = r.readU32().toInt()
         if (expectedCid != null && cid != expectedCid) throw ProtocolException("contact delta id mismatch")
