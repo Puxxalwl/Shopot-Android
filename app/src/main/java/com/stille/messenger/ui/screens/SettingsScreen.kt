@@ -45,7 +45,11 @@ fun SettingsScreen(
     onUpdateDownload: () -> Unit = {},
     onCancelDownload: () -> Unit = {},
     onAboutOpened: () -> Unit = {},
-    hasUpdate: Boolean = updateResult is UpdateResult.Available
+    hasUpdate: Boolean = updateResult is UpdateResult.Available,
+    networkConfig: com.stille.coreapi.ConfigBlob = com.stille.coreapi.ConfigBlob.DEFAULT,
+    coreReady: Boolean = false,
+    coreApiMinor: Int = 0,
+    onToggleNatPunch: (Boolean) -> Unit = {}
 ) {
     val english = language == "en"
     var about by rememberSaveable { mutableStateOf(false) }
@@ -68,6 +72,35 @@ fun SettingsScreen(
                     Text(if (english) "Language" else "Язык", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(12.dp))
                     SegmentedChoice(listOf("ru" to "Русский", "en" to "English"), language, { if (it != language) onToggleLanguage() })
+                }
+            }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
+        item {
+            GlassSurface(Modifier.padding(horizontal = 24.dp).fillMaxWidth()) {
+                Column {
+                    Row(
+                        Modifier.fillMaxWidth().toggleable(
+                            value = coreReady && coreApiMinor >= 10 && networkConfig.natPunch,
+                            enabled = coreReady && coreApiMinor >= 10,
+                            role = Role.Switch,
+                            onValueChange = onToggleNatPunch
+                        ).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(if (english) "Direct connection (NAT traversal)" else "Прямое соединение (обход NAT)", Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                        Switch(
+                            checked = coreReady && coreApiMinor >= 10 && networkConfig.natPunch,
+                            enabled = coreReady && coreApiMinor >= 10,
+                            onCheckedChange = null
+                        )
+                    }
+                    Text(
+                        if (english) "Tries a direct peer-to-peer route after connecting through a relay. Relay stays as fallback; success depends on both networks and routers." else "После соединения через ретранслятор пробует установить прямой канал между устройствами. Ретранслятор остаётся запасным путём; результат зависит от обеих сетей и роутеров.",
+                        Modifier.padding(start = 28.dp, end = 20.dp, bottom = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

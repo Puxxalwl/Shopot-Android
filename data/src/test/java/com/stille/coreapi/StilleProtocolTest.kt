@@ -94,6 +94,10 @@ class StilleProtocolTest {
         assertEquals(46, Method.GET_BOOTSTRAP.id)
         assertEquals(49, Method.CREATE_INVITE_EX.id)
         assertEquals(51, Method.GET_HISTORY_PAGE.id)
+        assertEquals(54, Method.REGENERATE_PROFILE_CODE.id)
+        assertEquals(18, Event.ROUTE_STATE.id)
+        assertEquals("2.10.0", GeneratedCoreApi.API_VERSION)
+        assertEquals(GeneratedCoreApi.Event.ROUTE_STATE, Event.ROUTE_STATE.id)
         assertEquals(17, Event.CONTACT_UPSERTED.id)
         assertEquals(21, status.RESYNC_REQUIRED)
         assertEquals("OK", status.name(0))
@@ -197,15 +201,69 @@ class StilleProtocolTest {
         // CONFIG_CHANGED (14): [ver u8][flags u32][server_addr str16][tor_addr str16].
         val config = FrameBuffer().apply {
             writeU8(1)
-            writeU32(0x00000005)
+            writeU32(0x00000003)
             writeStr16("relay.example.com:7777")
             writeStr16("")
         }.toByteArray()
         val cfg = Events.decodeConfigChanged(config)
         assertEquals(1, cfg.ver)
-        assertEquals(5, cfg.flags)
+        assertEquals(3, cfg.flags)
         assertEquals("relay.example.com:7777", cfg.serverAddr)
         assertEquals("", cfg.torAddr)
+        assertFalse(cfg.useTorMask)
+        assertTrue(cfg.useFakeTls)
+        assertFailsWith<ProtocolException> { Events.decodeConfigChanged(config + byteArrayOf(0)) }
+    }
+
+    @Test
+    fun `NAT config uses canonical bit six encoding and round trips`() {
+        assertBytes(byteArrayOf(), Requests.getConfig())
+        val defaults = ConfigBlob.DEFAULT
+        assertTrue(defaults.natPunch)
+        val encoded = Requests.setConfig(defaults)
+        assertEquals(1, encoded[0].toInt())
+        assertEquals(0x72, encoded[1].toInt() and 0xFF)
+        assertEquals(0, encoded[6].toInt() and 0xFF)
+        assertEquals(14, encoded[7].toInt() and 0xFF)
+        assertEquals(0, encoded[8].toInt() and 0xFF)
+        assertEquals("127.0.0.1:9050", encoded.copyOfRange(9, encoded.size).decodeToString())
+        val decoded = ConfigBlob.decode(encoded)
+        assertEquals(defaults, decoded)
+        assertEquals(defaults.copy(flags = defaults.flags and ConfigBlob.NAT_PUNCH.inv()), decoded.withNatPunch(false))
+        assertEquals(defaults, decoded.withNatPunch(true))
+    }
+
+    @Test
+    fun `config preserves other fields and accepts bracketed IPv6 relay addresses`() {
+        val config = ConfigBlob(
+            ConfigBlob.SERVER_MODE or ConfigBlob.USE_TOR_MASK or ConfigBlob.NAT_PUNCH,
+            serverAddr = "[2001:db8::1]:7777",
+            torAddr = "127.0.0.1:9050"
+        )
+        assertEquals(config, ConfigBlob.decode(config.encode()))
+        assertTrue(ConfigBlob.decode(config.encode()).withNatPunch(false).serverMode)
+    }
+
+    @Test
+    fun `config rejects unknown bits malformed addresses and trailing bytes`() {
+        assertFailsWith<IllegalArgumentException> { ConfigBlob(1 shl 7).encode() }
+        assertFailsWith<IllegalArgumentException> { ConfigBlob(ConfigBlob.SERVER_MODE, "").encode() }
+        assertEquals(ConfigBlob(0, serverAddr = "2001:db8::1:7777"), ConfigBlob.decode(ConfigBlob(0, serverAddr = "2001:db8::1:7777").encode()))
+        assertFailsWith<IllegalArgumentException> { ConfigBlob(0, serverAddr = ":7777").encode() }
+        assertFailsWith<IllegalArgumentException> { ConfigBlob(0, serverAddr = "relay.example:0").encode() }
+        assertFailsWith<IllegalArgumentException> { ConfigBlob(0, serverAddr = "x".repeat(65)).encode() }
+        assertFailsWith<IllegalArgumentException> { ConfigBlob.decode(ConfigBlob.DEFAULT.encode() + byteArrayOf(0)) }
+    }
+
+    @Test
+    fun `ROUTE_STATE decodes only known routes and exact payload`() {
+        val payload = FrameBuffer().apply { writeU32(7); writeU8(RouteState.DIRECT_PUNCHED.value) }.toByteArray()
+        val event = Events.decodeRouteState(payload)
+        assertEquals(7, event.cid)
+        assertEquals(RouteState.DIRECT_PUNCHED, event.route)
+        assertFailsWith<ProtocolException> { Events.decodeRouteState(payload + byteArrayOf(0)) }
+        assertFailsWith<ProtocolException> { Events.decodeRouteState(payload.copyOf(4) + byteArrayOf(9)) }
+        assertFailsWith<ProtocolException> { Events.decodeRouteState(byteArrayOf(0, 0, 0, 0, 1)) }
     }
 
     @Test
@@ -256,7 +314,7 @@ class StilleProtocolTest {
         assertEquals(4, InviteExMode.PROFILE.value)
         assertEquals(InviteExMode.PROFILE, InviteExMode.fromValue(4))
         assertEquals(9, Limits.SHORT_CODE)
-        assertEquals("2.8.0", GeneratedCoreApi.API_VERSION)
+        assertEquals("2.10.0", GeneratedCoreApi.API_VERSION)
         assertEquals(52, GeneratedCoreApi.Method.GENERATE_SHORT_CODE)
         assertEquals(53, GeneratedCoreApi.Method.DECODE_SHORT_CODE)
         assertEquals(54, GeneratedCoreApi.Method.REGENERATE_PROFILE_CODE)

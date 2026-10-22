@@ -235,6 +235,8 @@ fun StilleApp(
     val avatarMap = coreService?.avatars?.collectStarted()?.value ?: emptyMap()
     val inviteState = coreService?.inviteState?.collectStarted()?.value ?: com.stille.messenger.service.InviteState()
     val profileLinkState = coreService?.profileLink?.collectStarted()?.value ?: com.stille.messenger.service.ProfileLinkState()
+    val networkConfig = coreService?.networkConfig?.collectStarted()?.value ?: com.stille.coreapi.ConfigBlob.DEFAULT
+    val routeStates = coreService?.routeStates?.collectStarted()?.value ?: emptyMap()
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
     var showInvite by rememberSaveable { mutableStateOf(false) }
     // Deeplink routing state: prefilled accept input and sheet mode.
@@ -406,7 +408,7 @@ fun StilleApp(
                     onInvite = { showInvite = true }
                 )
                 "contacts" -> ContactsScreen(
-                    contacts = contacts, contactViews = contactViews, avatarBytes = avatarMap,
+                    contacts = contacts, contactViews = contactViews, avatarBytes = avatarMap, routeStates = routeStates,
                     onInvite = { showInvite = true }, onContactClick = { currentChatCid = it.cid }
                 )
                 "profile" -> ProfileScreen(
@@ -429,6 +431,10 @@ fun StilleApp(
                     onCheckUpdates = onManualUpdateCheck,
                     onAboutOpened = onManualUpdateCheck,
                     hasUpdate = updateState.result is com.stille.messenger.update.UpdateResult.Available && checkUpdatesOnLaunch,
+                    networkConfig = networkConfig,
+                    coreReady = inviteState.ready,
+                    coreApiMinor = inviteState.coreVersionMinor,
+                    onToggleNatPunch = { coreService?.setNatPunch(it) },
                     onUpdateDownload = {
                         val host = activity
                         if (host != null) {

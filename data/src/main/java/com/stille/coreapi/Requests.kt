@@ -11,6 +11,12 @@ object Requests {
 
     // ── 4.1 Service ──────────────────────────────────────────────────────
 
+    /** GET_CONFIG (35): empty request. */
+    fun getConfig(): ByteArray = byteArrayOf()
+
+    /** SET_CONFIG (36): versioned config blob. */
+    fun setConfig(config: ConfigBlob): ByteArray = config.encode()
+
     /** GET_VERSION (2): payload is empty ∅. */
     fun getVersion(): ByteArray = byteArrayOf()
 

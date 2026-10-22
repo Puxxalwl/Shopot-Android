@@ -133,10 +133,15 @@ object Events {
         )
     }
 
-    /**
-     * CONFIG_CHANGED (14, API 2.6.0) payload — the new config blob
-     * (§4.9: `[ver u8][flags u32][server_addr str16][tor_addr str16]`).
-     */
+    /** Decode ROUTE_STATE (18): [cid u32][route u8]. */
+    fun decodeRouteState(payload: ByteArray): RouteStateEvent {
+        if (payload.size != 5) throw ProtocolException("invalid route state payload size")
+        val r = FrameReader(payload)
+        val cid = r.readU32().toInt()
+        if (cid <= 0) throw ProtocolException("invalid route state contact id")
+        return RouteStateEvent(cid, RouteState.fromValue(r.readU8()))
+    }
+
     fun decodeContactStateChanged(payload: ByteArray): ContactStateChangedEvent {
         val r = FrameReader(payload)
         val event = ContactStateChangedEvent(r.readBytes(Limits.CONTACT_EPOCH), r.readU64(), r.readU32().toInt(), decodeConnection(r))
@@ -171,13 +176,21 @@ object Events {
         ConnState.fromValue(r.readU8()), r.readU32(), ConnErr.fromValue(r.readU16()), r.readU32()
     )
 
-    fun decodeConfigChanged(payload: ByteArray): ConfigBlob {
+    fun decodeConfigChanged(payload: ByteArray): ConfigBlob = decodeConfig(payload)
+
+    fun decodeConfig(payload: ByteArray): ConfigBlob {
         val r = FrameReader(payload)
         val ver = r.readU8()
+        if (ver != 1) throw ProtocolException("unsupported config version")
         val flags = r.readU32().toInt()
-        val serverAddr = r.readStr16()
-        val torAddr = r.readStr16()
-        return ConfigBlob(ver, flags, serverAddr, torAddr)
+        val config = ConfigBlob(flags, r.readStr16(), r.readStr16(), ver)
+        if (r.remaining != 0) throw ProtocolException("trailing config bytes")
+        try {
+            config.encode()
+        } catch (e: IllegalArgumentException) {
+            throw ProtocolException("invalid config blob: ${e.message}")
+        }
+        return config
     }
 
     // ── Event wrappers ──────────────────────────────────────────────────
@@ -189,16 +202,11 @@ object Events {
         val replyTo: ByteArray? = null
     )
 
+    data class RouteStateEvent(val cid: Int, val route: RouteState)
+
     data class ContactStateChangedEvent(val epoch: ByteArray, val revision: Long, val cid: Int, val connection: ConnectionStatus)
     data class ContactsChangedEvent(val epoch: ByteArray, val revision: Long)
     data class ContactUpsertedEvent(val epoch: ByteArray, val revision: Long, val contact: ContactView)
-
-    data class ConfigBlob(
-        val ver: Int,
-        val flags: Int,
-        val serverAddr: String,  // str16, empty = none
-        val torAddr: String      // str16, empty = none
-    )
 
     data class MessageDeliveredEvent(
         val cid: Int,

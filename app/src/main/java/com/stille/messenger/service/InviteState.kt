@@ -5,6 +5,7 @@ import com.stille.messenger.ui.InviteDeeplinks
 /** Invite secrets are process-memory state only: never save to Bundles, files or logs. */
 data class InviteState(
     val ready: Boolean = false,
+    val coreVersionMinor: Int = 0,
     val busy: Boolean = false,
     val code: String? = null,
     val inviteId: ByteArray? = null,

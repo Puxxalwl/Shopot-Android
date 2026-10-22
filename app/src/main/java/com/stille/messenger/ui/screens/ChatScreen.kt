@@ -314,7 +314,7 @@ fun ProfileScreen(name: String = "", avatarBytes: ByteArray? = null,
 }
 
 @Composable
-fun ContactsScreen(contacts: List<Contact> = emptyList(), contactViews: List<com.stille.coreapi.ContactView> = emptyList(), avatarBytes: Map<Int, ByteArray> = emptyMap(), onInvite: () -> Unit = {}, onContactClick: (Contact) -> Unit = {}) {
+fun ContactsScreen(contacts: List<Contact> = emptyList(), contactViews: List<com.stille.coreapi.ContactView> = emptyList(), avatarBytes: Map<Int, ByteArray> = emptyMap(), routeStates: Map<Int, com.stille.coreapi.RouteState> = emptyMap(), onInvite: () -> Unit = {}, onContactClick: (Contact) -> Unit = {}) {
     var query by rememberSaveable { mutableStateOf("") }
     val visible = remember(contacts, contactViews, query) {
         val pending = contactViews.filter { it.pending && contacts.none { contact -> contact.cid == it.cid } }.map {
@@ -344,15 +344,21 @@ fun ContactsScreen(contacts: List<Contact> = emptyList(), contactViews: List<com
         } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
             items(visible, key = { it.cid }, contentType = { "contact" }) { contact ->
                 val view = contactViews.firstOrNull { it.cid == contact.cid }
-                ContactItem(contact, avatarBytes[contact.cid], view?.connection?.state, enabled = view?.pending != true) { onContactClick(contact) }
+                ContactItem(contact, avatarBytes[contact.cid], view?.connection?.state, routeStates[contact.cid], enabled = view?.pending != true) { onContactClick(contact) }
             }
         }
     }
 }
 
 @Composable
-fun ContactItem(contact: Contact, avatarBytes: ByteArray? = null, connectionState: com.stille.coreapi.ConnState? = null, enabled: Boolean = true, onClick: () -> Unit) {
-    val status = when (connectionState) {
+fun ContactItem(contact: Contact, avatarBytes: ByteArray? = null, connectionState: com.stille.coreapi.ConnState? = null, route: com.stille.coreapi.RouteState? = null, enabled: Boolean = true, onClick: () -> Unit) {
+    val status = (route.takeIf { connectionState == com.stille.coreapi.ConnState.ONLINE })?.let {
+        when (it) {
+            com.stille.coreapi.RouteState.LAN -> copy("Прямое соединение · LAN", "Direct connection · LAN")
+            com.stille.coreapi.RouteState.RELAY -> copy("Через ретранслятор", "Via relay")
+            com.stille.coreapi.RouteState.DIRECT_PUNCHED -> copy("Прямое соединение · NAT пробит", "Direct connection · NAT traversed")
+        }
+    } ?: when (connectionState) {
         com.stille.coreapi.ConnState.PENDING, com.stille.coreapi.ConnState.DISCOVERING -> copy("Ожидает подключения", "Waiting to connect")
         com.stille.coreapi.ConnState.DIALING, com.stille.coreapi.ConnState.HANDSHAKING, com.stille.coreapi.ConnState.JOINING -> copy("Подключение…", "Connecting…")
         com.stille.coreapi.ConnState.FAILED -> copy("Ошибка подключения; повторим автоматически", "Connection issue; retrying automatically")

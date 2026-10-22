@@ -51,8 +51,9 @@ def main() -> None:
     if "SET_REACTION" in method_text and "REMOVE_REACTION" in method_text:
         methods += [("SET_REACTION", 8), ("REMOVE_REACTION", 9)]
     events = [(name, int(number)) for name, number in EVENT_RE.findall(event_text)]
-    # Event 15–17 names are specified in prose after the event table.
+    # Event 15–18 names are specified in prose after the event table.
     events += [("CONTACT_STATE_CHANGED", 15), ("CONTACTS_CHANGED", 16), ("CONTACT_UPSERTED", 17)] if "CONTACT_STATE_CHANGED" in event_text else []
+    events += [("ROUTE_STATE", 18)] if "ROUTE_STATE" in event_text else []
     statuses = [(name, int(number)) for number, name in STATUS_RE.findall(status_text)]
     statuses += [("RESYNC_REQUIRED", 21)] if "RESYNC_REQUIRED" in text else []
     limits = []

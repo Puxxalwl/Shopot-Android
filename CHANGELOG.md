@@ -3,6 +3,14 @@
 All notable changes to the Android client. Format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.5.0] - 2026-10-22
+
+### Added
+- Support core API 2.10 NAT traversal: default-on NAT-punch config can be
+  toggled in Settings, and contact rows show the core-reported LAN, relay, or
+  punched-direct route. Updated core submodule to `41ddf597` (API 2.10.0),
+  which also includes IPv6 direct sessions and UPnP mapping in the native core.
+
 ## [Unreleased]
 
 ### Changed

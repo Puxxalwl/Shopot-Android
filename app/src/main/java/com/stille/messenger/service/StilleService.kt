@@ -67,6 +67,10 @@ class StilleService : Service() {
     val confirmedContacts = _confirmedContacts.asStateFlow()
     private val _contactViews = MutableStateFlow<List<com.stille.coreapi.ContactView>>(emptyList())
     val contactViews = _contactViews.asStateFlow()
+    private val _networkConfig = MutableStateFlow(com.stille.coreapi.ConfigBlob.DEFAULT)
+    val networkConfig = _networkConfig.asStateFlow()
+    private val _routeStates = MutableStateFlow<Map<Int, com.stille.coreapi.RouteState>>(emptyMap())
+    val routeStates = _routeStates.asStateFlow()
     private var contactEpoch: ByteArray? = null
     private var contactRevision: Long = 0L
     private var apiVersion = CoreVersion(0, 0, 0)
@@ -74,6 +78,7 @@ class StilleService : Service() {
     // ACCEPT_INVITE creates a local pending contact before the remote JOIN is authenticated.
     private val pendingContactIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
     private val onlineContactIds = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
+    private val configMutex = Mutex()
     private val _avatars = MutableStateFlow<Map<Int, ByteArray>>(emptyMap())
     val avatars = _avatars.asStateFlow()
 
@@ -331,6 +336,26 @@ class StilleService : Service() {
         return Responses.decodeCreateInviteEx(response.second)
     }
 
+    fun setNatPunch(enabled: Boolean) {
+        serviceScope.launch {
+            if (!_isCoreReady.value || apiVersion.minor < 9) return@launch
+            configMutex.withLock {
+                try {
+                    val current = com.stille.coreapi.ConfigBlob.decode(
+                        sendRequest(Method.GET_CONFIG, Requests.getConfig()).second
+                    )
+                    val next = current.withNatPunch(enabled)
+                    if (next != current) sendRequest(Method.SET_CONFIG, Requests.setConfig(next))
+                    _networkConfig.value = next
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    _events.emit(CoreEvent.Error("Could not update network settings"))
+                }
+            }
+        }
+    }
+
     private fun requestContactSnapshot() {
         serviceScope.launch {
             try {
@@ -517,7 +542,7 @@ class StilleService : Service() {
                     stage = "handshake"
                     connectUds()
                     _isCoreReady.value = true
-                    _inviteState.value = InviteState(ready = true)
+                    _inviteState.value = InviteState(ready = true, coreVersionMinor = apiVersion.minor)
                     return@launch
                 } catch (e: CancellationException) { throw e
                 } catch (e: Exception) {
@@ -636,12 +661,22 @@ class StilleService : Service() {
             val version = Responses.decodeGetVersion(versionResp.second)
             if (version.major != 2) throw ProtocolException("incompatible core major version")
             apiVersion = version
+            _inviteState.update { it.copy(coreVersionMinor = version.minor) }
+            _routeStates.value = emptyMap()
+            _networkConfig.value = com.stille.coreapi.ConfigBlob.DEFAULT
             android.util.Log.i("StilleService", "Core version: ${version.major}.${version.minor}.${version.patch}")
             StilleLog.i("service", "core-connected", "api=${version.major}.${version.minor}.${version.patch}")
 
             val contacts = if (version.minor >= 7) {
                 sendRequest(Method.SUBSCRIBE_CONTACT_UPDATES, Requests.subscribeContactUpdates())
                 refreshContactBootstrap()
+                if (version.minor >= 9) {
+                    runCatching {
+                        _networkConfig.value = com.stille.coreapi.ConfigBlob.decode(
+                            sendRequest(Method.GET_CONFIG, Requests.getConfig()).second
+                        )
+                    }
+                }
                 _confirmedContacts.value
             } else {
                 val contactsResp = sendRequest(Method.LIST_CONTACTS, Requests.listContacts())
@@ -764,7 +799,8 @@ class StilleService : Service() {
                     _events.emit(com.stille.messenger.service.CoreEvent.MessageReceived(ev.message, ev.senderName))
                 }
                 14 -> { // CONFIG_CHANGED
-                    com.stille.coreapi.Events.decodeConfigChanged(payload)
+                    val config = com.stille.coreapi.Events.decodeConfigChanged(payload)
+                    _networkConfig.value = config
                 }
                 15 -> {
                     val ev = com.stille.coreapi.Events.decodeContactStateChanged(payload)
@@ -782,6 +818,13 @@ class StilleService : Service() {
                 16 -> {
                     val ev = com.stille.coreapi.Events.decodeContactsChanged(payload)
                     if (apiVersion.minor >= 7) serviceScope.launch { runCatching { applyContactsDelta(ev.epoch, ev.revision) } }
+                }
+                18 -> {
+                    if (apiVersion.minor >= 9) {
+                        val ev = com.stille.coreapi.Events.decodeRouteState(payload)
+                        _routeStates.update { current -> current + (ev.cid to ev.route) }
+                        _events.emit(CoreEvent.RouteChanged(ev.cid, ev.route))
+                    }
                 }
                 17 -> {
                     val ev = com.stille.coreapi.Events.decodeContactUpserted(payload)
@@ -931,6 +974,8 @@ class StilleService : Service() {
         _inviteState.value = InviteState(error = InviteError.CORE_UNAVAILABLE)
         _confirmedContacts.value = emptyList()
         _contactViews.value = emptyList()
+        _networkConfig.value = com.stille.coreapi.ConfigBlob.DEFAULT
+        _routeStates.value = emptyMap()
         contactEpoch = null
         contactRevision = 0L
         pendingContactIds.clear()
@@ -985,6 +1030,7 @@ sealed interface CoreEvent {
     data class Presence(val cid: Int, val online: Boolean, val lastSeen: Long) : CoreEvent
     data class Reaction(val cid: Int, val msgId: ByteArray, val op: Int, val codepoint: Int, val tsMs: Long) : CoreEvent
     data class ContactJoined(val cid: Int, val name: String) : CoreEvent
+    data class RouteChanged(val cid: Int, val route: com.stille.coreapi.RouteState) : CoreEvent
     data class ContactCard(val card: com.stille.coreapi.ContactCard) : CoreEvent
     data class AvatarReceived(val avatar: com.stille.coreapi.AvatarData) : CoreEvent
     data class FileReceived(val info: com.stille.coreapi.FileInfo) : CoreEvent

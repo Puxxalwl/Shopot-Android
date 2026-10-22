@@ -1,7 +1,7 @@
 package com.stille.coreapi
 
 /**
- * Binary UDS interface codec for stille-messenger core (API 2.8.0).
+ * Binary UDS interface codec for stille-messenger core (API 2.10.0).
  *
  * Implements the 16-byte LE frame header and all typed payload encoders/decoders
  * for request methods, responses, and events as defined in:
@@ -119,7 +119,8 @@ enum class Event(val id: Int) {
     CONFIG_CHANGED(14),
     CONTACT_STATE_CHANGED(15),
     CONTACTS_CHANGED(16),
-    CONTACT_UPSERTED(17);
+    CONTACT_UPSERTED(17),
+    ROUTE_STATE(18);
 
     companion object {
         fun fromId(id: Int) = entries.firstOrNull { it.id == id }
@@ -215,6 +216,7 @@ object Limits {
     const val INVITE_ID = 16
     const val CONTACT_EPOCH = 16
     const val REACHABLE_ENDPOINTS_MAX = 255
+    const val CONFIG_ADDRESS_MAX = 64
     // 2.8.0 — short identity code (§4.2): 8 Crockford data chars + 1 checksum char
     const val SHORT_CODE = 9
 }
@@ -232,6 +234,11 @@ enum class ConnErr(val value: Int) {
     NONE(0), DISCOVERY_DISABLED(1), TRANSPORT_UNAVAILABLE(2), TRANSPORT_TIMEOUT(3), AUTH_FAILED(4),
     JOIN_TIMEOUT(5), CAPACITY_EXHAUSTED(6), RELAY_UNREACHABLE(7), TOR_UNAVAILABLE(8), CANCELED(9);
     companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown connection error") }
+}
+
+enum class RouteState(val value: Int) {
+    LAN(0), RELAY(1), DIRECT_PUNCHED(2);
+    companion object { fun fromValue(value: Int) = entries.firstOrNull { it.value == value } ?: throw ProtocolException("unknown route state") }
 }
 
 enum class AcceptDisposition(val value: Int) {

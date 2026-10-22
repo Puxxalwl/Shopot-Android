@@ -67,7 +67,14 @@ logged or written to disk; the camera is released when the scanner closes
 or the app pauses. Invite codes never appear in logs.
 
 Address-less one-time invites need both devices on the same LAN with
-multicast enabled; otherwise use a reachable address or a relay.
+multicast enabled; otherwise use a reachable address or a relay. With the
+current core, **Settings → Direct connection (NAT traversal)** enables
+attempts to upgrade an existing relay session to a direct peer-to-peer path.
+It is enabled by default. Contacts show whether their active route is LAN,
+relay, or NAT-punched direct. The relay remains the fallback if either
+network/router cannot establish a direct path; NAT traversal is not guaranteed
+for every NAT type. Core 2.10 also tries IPv6 direct paths and UPnP mapping
+when available, subject to router and network support.
 
 ## Profile photo
 
